@@ -1,13 +1,11 @@
 import * as THREE from "three";
+import CameraManager from "../../services/CameraManager";
 
 const VERTEX_SHADER = `
 varying vec2 vUv;
 
 void main() {
-  float x = -1.0 + float((gl_VertexID & 1) << 2);
-  float y = -1.0 + float((gl_VertexID & 2) << 1);
-  vUv.x = (x+1.0)*0.5;
-  vUv.y = (y+1.0)*0.5;
+  vUv = uv;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 `;
@@ -69,11 +67,15 @@ export default class ShaderToyMaterial extends THREE.ShaderMaterial {
     iSampleRate: { value: 0 },
   };
 
+  shouldUpdateUniforms = true;
+  shaderCode: string;
+
   constructor(shaderCode: string) {
     super({
       vertexShader: VERTEX_SHADER,
     });
 
+    this.shaderCode = shaderCode;
     this.fragmentShader = FRAGMENT_SHADER + "\n" + shaderCode;
 
     this.update();
@@ -84,28 +86,49 @@ export default class ShaderToyMaterial extends THREE.ShaderMaterial {
   }
 
   update() {
-    this.uniforms.iTime.value = this.clock.getElapsedTime();
-    this.uniforms.iTimeDelta.value = this.clock.getDelta();
-    this.uniforms.iFrame.value = this.uniforms.iFrame.value + 1;
+    if (this.shouldUpdateUniforms) {
+      this.uniforms.iTime.value = this.clock.getElapsedTime();
+      this.uniforms.iTimeDelta.value = this.clock.getDelta();
+      this.uniforms.iFrame.value = this.uniforms.iFrame.value + 1;
 
-    const date = new Date();
-    const seconds =
-      date.getSeconds() + 60 * date.getMinutes() + 60 * 60 * date.getHours();
-    this.uniforms.iDate.value = new THREE.Vector4(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDay(),
-      seconds
-    );
+      const date = new Date();
+      const seconds =
+        date.getSeconds() + 60 * date.getMinutes() + 60 * 60 * date.getHours();
+      this.uniforms.iDate.value = new THREE.Vector4(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDay(),
+        seconds
+      );
 
-    for (let i = 0; i < 4; i++) {
-      const uniformName = "iChannel" + i;
-      const image = (this.uniforms as any)[uniformName]?.value?.image;
-      if (image) {
-        this.uniforms.iChannelResolution.value[i] = new THREE.Vector3(
-          image.width,
-          image.height
-        );
+      const { isPointerDown, pointerPosition, pointerDownPosition } =
+        CameraManager;
+
+      const invertedY =
+        this.uniforms.iResolution.value.y - pointerDownPosition.y;
+
+      this.uniforms.iMouse.value.set(
+        pointerPosition.x,
+        this.uniforms.iResolution.value.y - pointerPosition.y,
+        !isPointerDown ? -pointerDownPosition.x : pointerDownPosition.x,
+        !isPointerDown ? -invertedY : invertedY
+      );
+
+      for (let i = 0; i < 4; i++) {
+        const uniformName = "iChannel" + i;
+
+        (this.uniforms as any)[uniformName] = {
+          value: CameraManager.textures[i],
+        };
+
+        const image = (this.uniforms as any)[uniformName]?.value?.image;
+        if (image) {
+          this.uniforms.iChannelResolution.value[i] = new THREE.Vector3(
+            image.width,
+            image.height,
+            1
+          );
+        }
       }
     }
 

@@ -1,4 +1,5 @@
-#preview {
+#preview,
+.fullscreen {
   width: 100%;
   height: 100%;
 }

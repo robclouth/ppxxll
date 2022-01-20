@@ -1,9 +1,105 @@
+import { Size, Viewport } from "@react-three/fiber";
+import { makeAutoObservable } from "mobx";
 import * as THREE from "three";
+import ShaderToyMaterial from "../components/renderer/ShaderToyMaterial";
+
+const chunkWidth = 500;
+const chunkHeight = 500;
 
 class CameraManager {
-  renderer: any;
-  camera: any;
-  scene: any;
+  material?: ShaderToyMaterial;
+
+  isExporting = false;
+  exportProgress = 0;
+  viewport!: Viewport;
+
+  imageCapture?: ImageCapture;
+  videoTexture?: THREE.VideoTexture;
+
+  textures: (THREE.Texture | undefined)[] = [
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+  ];
+
+  isPointerDown = false;
+  pointerPosition = {
+    x: 0,
+    y: 0,
+  };
+  pointerDownPosition = {
+    x: 0,
+    y: 0,
+  };
+  pointerUpPosition = {
+    x: 0,
+    y: 0,
+  };
+
+  constructor() {
+    makeAutoObservable(this);
+
+    this.initCamera();
+  }
+
+  async initCamera() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+
+      const constraints = {
+        video: { width: 1280, height: 720, facingMode: "user" },
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(
+        constraints
+      );
+
+      const videoElement = document.createElement("video");
+      videoElement.srcObject = mediaStream;
+      videoElement.muted = true;
+      videoElement.controls = false;
+      videoElement.autoplay = true;
+      videoElement.playsInline = true;
+      videoElement.play();
+
+      this.videoTexture = new THREE.VideoTexture(videoElement);
+
+      const mediaStreamTrack = mediaStream.getVideoTracks()[0];
+      this.imageCapture = new ImageCapture(mediaStreamTrack);
+
+      this.textures[0] = this.videoTexture;
+    } catch (error) {
+      console.error("enumerateDevices() error:", error);
+    }
+  }
+
+  setPointerDown(x: number, y: number) {
+    this.isPointerDown = true;
+    this.pointerDownPosition = {
+      x,
+      y,
+    };
+    this.pointerPosition = {
+      x,
+      y,
+    };
+  }
+
+  setPointerUp(x: number, y: number) {
+    this.isPointerDown = false;
+    this.pointerUpPosition = {
+      x,
+      y,
+    };
+  }
+
+  setPointerPosition(x: number, y: number) {
+    this.pointerPosition = {
+      x,
+      y,
+    };
+  }
 
   wait() {
     return new Promise((resolve) => {
@@ -11,44 +107,49 @@ class CameraManager {
     });
   }
 
-  setRenderParams(renderer: any, camera: any, scene: any) {
-    this.renderer = renderer;
-    this.camera = camera;
-    this.scene = scene;
+  setViewport(viewport: Viewport, size: Size) {
+    this.viewport = viewport;
+
+    if (!this.isExporting) this.material?.resize(size.width, size.height);
   }
 
-  async takePicture() {
-    const blob = await this.makeBigPng(8000, 8000);
+  setShaderCode(code: string) {
+    this.material = new ShaderToyMaterial(code);
+  }
+
+  async takePicture(width: number, height: number) {
+    if (!this.material) return;
+
+    this.setExporting(true);
+    this.exportProgress = 0;
+    this.material.shouldUpdateUniforms = false;
+    this.material.resize(width, height);
+    const blob = await this.exportPng(width, height);
     this.saveData(blob);
+    this.material.shouldUpdateUniforms = true;
+    this.setExporting(false);
   }
 
-  saveData(blob: Blob) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement<any>("a");
-    document.body.appendChild(a);
-    a.style = "display: none";
-    a.href = URL.createObjectURL(blob);
-    a.download = "test.png";
-    a.click();
-    URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+  setExporting(isExporting: boolean) {
+    this.isExporting = isExporting;
   }
 
-  async makeBigPng(width: number, height: number) {
+  async exportPng(width: number, height: number) {
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    camera.position.z = 1;
+    const scene = new THREE.Scene();
+    const quad = new THREE.Mesh(
+      new THREE.PlaneBufferGeometry(2, 2, 1, 1),
+      this.material
+    );
+    scene.add(quad);
+
+    const renderer = new THREE.WebGLRenderer({ alpha: true });
+
     const pngRGBAWriter = new (window as any).dekapng.PNGRGBAWriter(
       width,
       height
     );
-
-    const chunkWidth = 500;
-    const chunkHeight = 500;
-
-    // const progress = document.querySelector("#progress");
-    function setProgress(p: number) {
-      // progress.textContent = `${p * 100 | 0}%`;
-    }
-
-    setProgress(0);
 
     for (let chunkY = 0; chunkY < height; chunkY += chunkHeight) {
       const rowChunks = [];
@@ -58,6 +159,9 @@ class CameraManager {
         const localWidth = Math.min(chunkWidth, width - chunkX);
 
         const data = this.drawArea(
+          renderer,
+          camera,
+          scene,
           width,
           height,
           chunkX,
@@ -76,14 +180,20 @@ class CameraManager {
         });
       }
 
-      setProgress(Math.min(1, (chunkY + chunkHeight) / height));
+      this.exportProgress = (chunkY + chunkHeight) / height;
+
       await this.wait();
     }
+
+    renderer.dispose();
 
     return pngRGBAWriter.finishAndGetBlob();
   }
 
   drawArea(
+    renderer: THREE.WebGLRenderer,
+    camera: THREE.OrthographicCamera,
+    scene: THREE.Scene,
     width: number,
     height: number,
     chunkX: number,
@@ -91,9 +201,9 @@ class CameraManager {
     chunkWidth: number,
     chunkHeight: number
   ) {
-    this.renderer.setSize(chunkWidth, chunkHeight);
+    renderer.setSize(chunkWidth, chunkHeight);
 
-    this.camera.setViewOffset(
+    camera.setViewOffset(
       width,
       height,
       chunkX,
@@ -101,12 +211,13 @@ class CameraManager {
       chunkWidth,
       chunkHeight
     );
-    this.camera.updateProjectionMatrix();
+    camera.updateProjectionMatrix();
 
-    this.renderer.render(this.scene, this.camera);
+    renderer.render(scene, camera);
 
     const data = new Uint8Array(chunkWidth * chunkHeight * 4);
-    const gl = this.renderer.context;
+    const gl = renderer.getContext();
+
     gl.readPixels(
       0,
       0,
@@ -133,6 +244,18 @@ class CameraManager {
       height: chunkHeight,
       data: data,
     };
+  }
+
+  saveData(blob: Blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement<any>("a");
+    document.body.appendChild(a);
+    a.style = "display: none";
+    a.href = URL.createObjectURL(blob);
+    a.download = "test.png";
+    a.click();
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
 }
 
