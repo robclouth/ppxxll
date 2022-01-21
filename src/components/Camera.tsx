@@ -12,6 +12,8 @@ import GLView from "./renderer/GLView";
 import ShaderList from "./ShaderList";
 import TuneIcon from "@mui/icons-material/Tune";
 import Parameters from "./Parameters";
+import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
+
 const buttonStyle = {
   color: "white",
   backgroundColor: "rgba(0,0,0,0.2)",
@@ -44,8 +46,12 @@ function Camera() {
     setParametersOpen(true);
   }
 
-  async function takePicture() {
+  async function handleTakePicturePress() {
     await CameraManager.takePicture();
+  }
+
+  function handleSwitchCameraPress() {
+    CameraManager.switchCamera();
   }
 
   const parameters = activeShader?.passes[0].parameters
@@ -88,17 +94,7 @@ function Camera() {
             p: 1,
             justifyContent: "center",
           }}
-        >
-          {parameters.length > 0 && (
-            <IconButton
-              size="large"
-              sx={buttonStyle}
-              onClick={handleParametersPress}
-            >
-              <TuneIcon fontSize="inherit" />
-            </IconButton>
-          )}
-        </Box>
+        ></Box>
         <Box
           component="div"
           sx={{
@@ -109,12 +105,32 @@ function Camera() {
             display: "flex",
             flexDirection: "row",
             p: 1,
-            justifyContent: "center",
+            justifyContent: "space-between",
           }}
         >
-          <IconButton size="large" sx={buttonStyle} onClick={takePicture}>
+          <IconButton
+            size="large"
+            sx={buttonStyle}
+            onClick={handleSwitchCameraPress}
+          >
+            <CameraswitchIcon fontSize="inherit" />
+          </IconButton>
+          <IconButton
+            size="large"
+            sx={buttonStyle}
+            onClick={handleTakePicturePress}
+          >
             <PhotoCameraIcon fontSize="inherit" />
           </IconButton>
+          {parameters.length > 0 && (
+            <IconButton
+              size="large"
+              sx={buttonStyle}
+              onClick={handleParametersPress}
+            >
+              <TuneIcon fontSize="inherit" />
+            </IconButton>
+          )}
         </Box>
         <IconButton
           size="large"

@@ -16,6 +16,7 @@ class CameraManager {
   viewport!: Viewport;
 
   imageCapture?: ImageCapture;
+  mediaStream?: MediaStream;
   cameraTexture?: THREE.VideoTexture;
 
   canvasWidth = 0;
@@ -28,6 +29,10 @@ class CameraManager {
     undefined,
   ];
 
+  activeCamera: "front" | "back" = "back";
+  frontCameraDeviceId?: string;
+  backCameraDeviceId?: string;
+
   constructor() {
     makeAutoObservable(this);
     this.material = new ShaderToyMaterial();
@@ -35,31 +40,8 @@ class CameraManager {
 
   async init() {
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-
-      const constraints = {
-        video: { width: 1280, height: 720, facingMode: "user" },
-      };
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia(
-        constraints
-      );
-      const mediaStreamTrack = mediaStream.getVideoTracks()[0];
-      let { width, height } = mediaStreamTrack.getSettings();
-
-      const videoElement = document.createElement("video");
-      videoElement.srcObject = mediaStream;
-      videoElement.muted = true;
-      videoElement.controls = false;
-      videoElement.autoplay = true;
-      videoElement.playsInline = true;
-      videoElement.width = width!;
-      videoElement.height = height!;
-      videoElement.play();
-
-      this.cameraTexture = new THREE.VideoTexture(videoElement);
-
-      this.imageCapture = new ImageCapture(mediaStreamTrack);
+      await this.detectCameras();
+      await this.startVideoCapture();
 
       this.setInputTexture(0, this.cameraTexture);
     } catch (error) {
@@ -67,10 +49,96 @@ class CameraManager {
     }
   }
 
+  async detectCameras() {
+    const tempStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+    });
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    let frontDeviceId;
+    let backDeviceId;
+    if (devices.length > 0) {
+      /* defaults so all this will work on a desktop */
+      frontDeviceId = devices[0].deviceId;
+      backDeviceId = devices[0].deviceId;
+    }
+    /* look for front and back devices */
+    devices.forEach((device) => {
+      if (device.kind === "videoinput") {
+        if (device.label && device.label.length > 0) {
+          if (device.label.toLowerCase().indexOf("back") >= 0)
+            backDeviceId = device.deviceId;
+          else if (device.label.toLowerCase().indexOf("front") >= 0)
+            frontDeviceId = device.deviceId;
+        }
+      }
+    });
+
+    this.frontCameraDeviceId = frontDeviceId;
+    this.backCameraDeviceId = backDeviceId;
+
+    tempStream.getTracks().forEach((track) => {
+      track.stop();
+    });
+  }
+
+  async startVideoCapture() {
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach((track) => {
+        track.stop();
+      });
+    }
+
+    if (this.cameraTexture) this.cameraTexture.dispose();
+
+    const constraints = {
+      audio: false,
+      video: {
+        deviceId: {
+          exact:
+            this.activeCamera === "front"
+              ? this.frontCameraDeviceId
+              : this.backCameraDeviceId,
+        },
+      },
+    };
+
+    this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+    const mediaStreamTrack = this.mediaStream.getVideoTracks()[0];
+    let { width, height } = mediaStreamTrack.getSettings();
+
+    const videoElement = document.createElement("video");
+    videoElement.srcObject = this.mediaStream;
+    videoElement.muted = true;
+    videoElement.controls = false;
+    videoElement.autoplay = true;
+    videoElement.playsInline = true;
+    videoElement.width = width!;
+    videoElement.height = height!;
+    videoElement.play();
+
+    const previousCameraTexture = this.cameraTexture;
+    this.cameraTexture = new THREE.VideoTexture(videoElement);
+
+    this.imageCapture = new ImageCapture(mediaStreamTrack);
+
+    if (previousCameraTexture)
+      this.inputTextures = this.inputTextures.map((texture) =>
+        texture === previousCameraTexture ? this.cameraTexture : texture
+      );
+
+    if (this.material) this.material.updateInputTextures(this.inputTextures);
+  }
+
+  switchCamera() {
+    this.activeCamera = this.activeCamera === "front" ? "back" : "front";
+    this.startVideoCapture();
+  }
+
   setShader(shader: Shader) {
     if (this.material) this.material.dispose();
 
-    this.material = new ShaderToyMaterial(shader?.passes[0].code);
+    this.material = new ShaderToyMaterial(shader);
     this.material?.setSize(this.canvasWidth, this.canvasHeight);
     this.material.updateInputTextures(this.inputTextures);
   }

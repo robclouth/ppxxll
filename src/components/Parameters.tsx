@@ -41,6 +41,7 @@ function Parameters({ open, onClose }: Props) {
   function renderParameter(parameter: Parameter) {
     return (
       <Box
+        key={parameter.name}
         component="div"
         sx={{
           display: "flex",
@@ -48,7 +49,7 @@ function Parameters({ open, onClose }: Props) {
           alignItems: "stretch",
         }}
       >
-        <ParameterSlider key={parameter.name} parameter={parameter} />
+        <ParameterSlider parameter={parameter} />
       </Box>
     );
   }

@@ -55,7 +55,7 @@ class ShaderManager {
   async init() {
     await Promise.all([
       this.addShaderToyShader("ftKSWz"),
-      this.addShaderToyShader("XsjGDt"),
+      this.addShaderToyShader("NsfcWf"),
       this.addShaderToyShader("fdscD2"),
     ]);
   }
@@ -77,8 +77,7 @@ class ShaderManager {
         description: info.description,
         author: info.username,
         passes: json.Shader.renderpass.map((pass: any) => ({
-          code: pass.code,
-          parameters: this.parseParameters(pass.code),
+          ...this.parseParameters(pass.code),
           inputs: pass.inputs.map((input: any) => ({
             id: input.id.toString(),
             type: ctypeToType[input.ctype],
@@ -136,8 +135,9 @@ class ShaderManager {
         maxValue,
       };
     }
+    code = code.replaceAll(parameterPattern, "uniform $2 $3;");
 
-    return parameters;
+    return { code, parameters };
   }
 }
 

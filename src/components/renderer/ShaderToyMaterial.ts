@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Shader } from "../../services/ShaderManager";
 
 const VERTEX_SHADER = `
 varying vec2 vUv;
@@ -97,17 +98,23 @@ export default class ShaderToyMaterial extends THREE.ShaderMaterial {
 
   shouldUpdateUniforms = true;
 
-  constructor(code?: string) {
+  shader?: Shader;
+
+  constructor(shader?: Shader) {
     super({
       vertexShader: VERTEX_SHADER,
       fragmentShader:
-        BASE_FRAGMENT_SHADER + "\n" + (code || DEFAULT_FRAGMENT_SHADER),
+        BASE_FRAGMENT_SHADER +
+        "\n" +
+        (shader?.passes[0].code || DEFAULT_FRAGMENT_SHADER),
     });
 
     this.fragmentShader = this.fragmentShader.replace(
       /(texture)(\(\s*iChannel)(\d)(\s*,\s*.*)(\))/g,
       "$1Cover$2$3$4,$3$5"
     );
+
+    this.shader = shader;
 
     this.updateUniforms();
   }
@@ -131,6 +138,17 @@ export default class ShaderToyMaterial extends THREE.ShaderMaterial {
         date.getDay(),
         seconds
       );
+
+      // custom uniforms
+      if (this.shader) {
+        for (const parameter of Object.values(
+          this.shader.passes[0].parameters
+        )) {
+          (this.uniforms as any)[parameter.name] = {
+            value: parameter.value,
+          };
+        }
+      }
     }
 
     requestAnimationFrame(() => this.updateUniforms());
