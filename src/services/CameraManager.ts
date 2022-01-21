@@ -1,49 +1,35 @@
+import * as THREE from "three";
 import { Size, Viewport } from "@react-three/fiber";
 import { makeAutoObservable } from "mobx";
-import * as THREE from "three";
 import ShaderToyMaterial from "../components/renderer/ShaderToyMaterial";
+import { Shader } from "./ShaderManager";
 
 const chunkWidth = 500;
 const chunkHeight = 500;
 
 class CameraManager {
-  material?: ShaderToyMaterial;
+  material: ShaderToyMaterial;
 
   isExporting = false;
   exportProgress = 0;
   viewport!: Viewport;
 
   imageCapture?: ImageCapture;
-  videoTexture?: THREE.VideoTexture;
+  cameraTexture?: THREE.VideoTexture;
 
-  textures: (THREE.Texture | undefined)[] = [
+  inputTextures: (THREE.Texture | undefined)[] = [
     undefined,
     undefined,
     undefined,
     undefined,
   ];
 
-  isPointerDown = false;
-  pointerPosition = {
-    x: 0,
-    y: 0,
-  };
-  pointerDownPosition = {
-    x: 0,
-    y: 0,
-  };
-  pointerUpPosition = {
-    x: 0,
-    y: 0,
-  };
-
   constructor() {
     makeAutoObservable(this);
-
-    this.initCamera();
+    this.material = new ShaderToyMaterial();
   }
 
-  async initCamera() {
+  async init() {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
 
@@ -54,6 +40,8 @@ class CameraManager {
       const mediaStream = await navigator.mediaDevices.getUserMedia(
         constraints
       );
+      const mediaStreamTrack = mediaStream.getVideoTracks()[0];
+      let { width, height } = mediaStreamTrack.getSettings();
 
       const videoElement = document.createElement("video");
       videoElement.srcObject = mediaStream;
@@ -61,44 +49,25 @@ class CameraManager {
       videoElement.controls = false;
       videoElement.autoplay = true;
       videoElement.playsInline = true;
+      videoElement.width = width!;
+      videoElement.height = height!;
       videoElement.play();
 
-      this.videoTexture = new THREE.VideoTexture(videoElement);
+      this.cameraTexture = new THREE.VideoTexture(videoElement);
 
-      const mediaStreamTrack = mediaStream.getVideoTracks()[0];
       this.imageCapture = new ImageCapture(mediaStreamTrack);
 
-      this.textures[0] = this.videoTexture;
+      this.setInputTexture(0, this.cameraTexture);
     } catch (error) {
       console.error("enumerateDevices() error:", error);
     }
   }
 
-  setPointerDown(x: number, y: number) {
-    this.isPointerDown = true;
-    this.pointerDownPosition = {
-      x,
-      y,
-    };
-    this.pointerPosition = {
-      x,
-      y,
-    };
-  }
+  setShader(shader: Shader) {
+    if (this.material) this.material.dispose();
 
-  setPointerUp(x: number, y: number) {
-    this.isPointerDown = false;
-    this.pointerUpPosition = {
-      x,
-      y,
-    };
-  }
-
-  setPointerPosition(x: number, y: number) {
-    this.pointerPosition = {
-      x,
-      y,
-    };
+    this.material = new ShaderToyMaterial(shader?.passes[0].code);
+    this.material.updateInputTextures(this.inputTextures);
   }
 
   wait() {
@@ -113,8 +82,9 @@ class CameraManager {
     if (!this.isExporting) this.material?.resize(size.width, size.height);
   }
 
-  setShaderCode(code: string) {
-    this.material = new ShaderToyMaterial(code);
+  setInputTexture(index: number, texture?: THREE.Texture) {
+    this.inputTextures[index] = texture;
+    this.material.updateInputTextures(this.inputTextures);
   }
 
   async takePicture(width: number, height: number) {

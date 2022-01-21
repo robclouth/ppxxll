@@ -1,0 +1,67 @@
+import { makeAutoObservable } from "mobx";
+import CameraManager from "./CameraManager";
+import ShaderManager from "./ShaderManager";
+
+class App {
+  isPointerDown = false;
+  pointerPosition = {
+    x: 0,
+    y: 0,
+  };
+  pointerDownPosition = {
+    x: 0,
+    y: 0,
+  };
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  async init() {
+    await ShaderManager.init();
+    await CameraManager.init();
+  }
+
+  setPointerDown(x: number, y: number) {
+    this.isPointerDown = true;
+    this.pointerDownPosition = {
+      x,
+      y,
+    };
+    this.pointerPosition = {
+      x,
+      y,
+    };
+
+    CameraManager.material.updateMouseUniforms(
+      this.isPointerDown,
+      this.pointerPosition,
+      this.pointerDownPosition
+    );
+  }
+
+  setPointerUp(x: number, y: number) {
+    this.isPointerDown = false;
+
+    CameraManager.material.updateMouseUniforms(
+      this.isPointerDown,
+      this.pointerPosition,
+      this.pointerDownPosition
+    );
+  }
+
+  setPointerPosition(x: number, y: number) {
+    this.pointerPosition = {
+      x,
+      y,
+    };
+
+    CameraManager.material.updateMouseUniforms(
+      this.isPointerDown,
+      this.pointerPosition,
+      this.pointerDownPosition
+    );
+  }
+}
+
+export default new App();

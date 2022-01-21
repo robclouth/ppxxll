@@ -1,8 +1,9 @@
 import { Box, createTheme, ThemeProvider } from "@mui/material";
-import React from "react";
+import React, { useEffect } from "react";
 import "./App.css";
 import Camera from "./components/Camera";
 import CssBaseline from "@mui/material/CssBaseline";
+import AppManager from "./services/App";
 
 const theme = createTheme({
   palette: {
@@ -11,6 +12,13 @@ const theme = createTheme({
 });
 
 function App() {
+  async function init() {
+    await AppManager.init();
+  }
+  useEffect(() => {
+    init();
+  }, []);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

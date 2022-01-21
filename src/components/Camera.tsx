@@ -1,16 +1,38 @@
-import { Box, IconButton } from "@mui/material";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
-
-import GLView from "./renderer/GLView";
-import CameraManager from "../services/CameraManager";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+import { Box, Button, IconButton } from "@mui/material";
+import { useState } from "react";
 import { FullScreen, useFullScreenHandle } from "react-full-screen";
+import CameraManager from "../services/CameraManager";
+import ShaderManager from "../services/ShaderManager";
 import ImageInputButton from "./ImageInputButton";
+import GLView from "./renderer/GLView";
+import ShaderList from "./ShaderList";
+
+const buttonStyle = {
+  color: "white",
+  backgroundColor: "rgba(0,0,0,0.2)",
+  "&:hover": {
+    backgroundColor: "rgba(0,0,0,0.1)",
+  },
+};
 
 function Camera() {
   const handle = useFullScreenHandle();
+
+  const { activeShader } = ShaderManager;
+
+  const [shaderListOpen, setShaderListOpen] = useState(false);
+
+  function handleShaderListClose() {
+    setShaderListOpen(false);
+  }
+
+  function handleShaderListPress() {
+    setShaderListOpen(true);
+  }
 
   async function takePicture() {
     await CameraManager.takePicture(2000, 2000);
@@ -28,27 +50,43 @@ function Camera() {
           component="div"
           sx={{
             position: "absolute",
+            bottom: 0,
             top: 0,
-            left: 0,
             display: "flex",
             flexDirection: "column",
+            p: 1,
+            justifyContent: "center",
           }}
         >
-          <ImageInputButton index={0} />
-          <ImageInputButton index={1} />
-          <ImageInputButton index={2} />
-          <ImageInputButton index={3} />
+          {activeShader?.passes[0].inputs.map((input, i) => (
+            <ImageInputButton key={i} index={i} />
+          ))}
+        </Box>
+        <Box
+          component="div"
+          sx={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            display: "flex",
+            flexDirection: "row",
+            p: 1,
+            justifyContent: "center",
+          }}
+        >
+          <IconButton size="large" sx={buttonStyle} onClick={takePicture}>
+            <PhotoCameraIcon fontSize="inherit" />
+          </IconButton>
         </Box>
         <IconButton
           size="large"
-          sx={{ position: "absolute", bottom: 10, right: 10, color: "white" }}
-          onClick={takePicture}
-        >
-          <PhotoCameraIcon fontSize="inherit" />
-        </IconButton>
-        <IconButton
-          size="large"
-          sx={{ position: "absolute", top: 10, right: 10, color: "white" }}
+          sx={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            ...buttonStyle,
+          }}
           onClick={handle.active ? handle.exit : handle.enter}
         >
           {handle.active ? (
@@ -57,6 +95,20 @@ function Camera() {
             <FullscreenIcon fontSize="inherit" />
           )}
         </IconButton>
+        <Button
+          size="large"
+          sx={{
+            position: "absolute",
+            top: 10,
+            left: 10,
+            ...buttonStyle,
+          }}
+          onClick={handleShaderListPress}
+          endIcon={<KeyboardArrowDownIcon />}
+        >
+          {ShaderManager.activeShader?.name || "None"}
+        </Button>
+        <ShaderList open={shaderListOpen} onClose={handleShaderListClose} />
       </Box>
     </FullScreen>
   );
