@@ -51,10 +51,13 @@ void main () {
 `;
 
 const DEFAULT_FRAGMENT_SHADER = `
+const float test1 = 1.0; // @param min -1, max 1
+const float test2 = -1.0; // @param min -10, max 10
+
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
   vec2 uv = fragCoord / iResolution.xy;
-  fragColor = texture(iChannel0, uv);
+  fragColor = texture(iChannel0, uv) * test1;
 }
 `;
 
@@ -109,7 +112,7 @@ export default class ShaderToyMaterial extends THREE.ShaderMaterial {
     this.updateUniforms();
   }
 
-  resize(width: number, height: number) {
+  setSize(width: number, height: number) {
     this.uniforms.iResolution.value.set(width, height);
   }
 
@@ -128,18 +131,6 @@ export default class ShaderToyMaterial extends THREE.ShaderMaterial {
         date.getDay(),
         seconds
       );
-    }
-
-    for (let i = 0; i < 4; i++) {
-      const uniformName = "iChannel" + i;
-
-      const texture = (this.uniforms as any)[uniformName]
-        ?.value as THREE.Texture;
-
-      if (texture?.image) {
-        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(0.5, 1);
-      }
     }
 
     requestAnimationFrame(() => this.updateUniforms());
@@ -171,8 +162,8 @@ export default class ShaderToyMaterial extends THREE.ShaderMaterial {
       const image = (this.uniforms as any)[uniformName]?.value?.image;
       if (image) {
         this.uniforms.iChannelResolution.value[i] = new THREE.Vector3(
-          720,
-          1280,
+          image.width,
+          image.height,
           1
         );
       }

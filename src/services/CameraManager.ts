@@ -3,9 +3,10 @@ import { Size, Viewport } from "@react-three/fiber";
 import { makeAutoObservable } from "mobx";
 import ShaderToyMaterial from "../components/renderer/ShaderToyMaterial";
 import { Shader } from "./ShaderManager";
+import App from "./App";
 
-const chunkWidth = 500;
-const chunkHeight = 500;
+const chunkWidth = 1000;
+const chunkHeight = 1000;
 
 class CameraManager {
   material: ShaderToyMaterial;
@@ -16,6 +17,9 @@ class CameraManager {
 
   imageCapture?: ImageCapture;
   cameraTexture?: THREE.VideoTexture;
+
+  canvasWidth = 0;
+  canvasHeight = 0;
 
   inputTextures: (THREE.Texture | undefined)[] = [
     undefined,
@@ -67,6 +71,7 @@ class CameraManager {
     if (this.material) this.material.dispose();
 
     this.material = new ShaderToyMaterial(shader?.passes[0].code);
+    this.material?.setSize(this.canvasWidth, this.canvasHeight);
     this.material.updateInputTextures(this.inputTextures);
   }
 
@@ -76,10 +81,11 @@ class CameraManager {
     });
   }
 
-  setViewport(viewport: Viewport, size: Size) {
-    this.viewport = viewport;
+  setCanvasSize(width: number, height: number) {
+    this.canvasWidth = width;
+    this.canvasHeight = height;
 
-    if (!this.isExporting) this.material?.resize(size.width, size.height);
+    if (!this.isExporting) this.material?.setSize(width, height);
   }
 
   setInputTexture(index: number, texture?: THREE.Texture) {
@@ -87,16 +93,48 @@ class CameraManager {
     this.material.updateInputTextures(this.inputTextures);
   }
 
-  async takePicture(width: number, height: number) {
+  async takePicture() {
     if (!this.material) return;
+
+    const outputSize = App.outputSize;
 
     this.setExporting(true);
     this.exportProgress = 0;
+
+    this.cameraTexture?.image.pause();
     this.material.shouldUpdateUniforms = false;
-    this.material.resize(width, height);
-    const blob = await this.exportPng(width, height);
+
+    if (this.imageCapture) {
+      const blob = await this.imageCapture.takePhoto();
+      const photoImg = document.createElement("img");
+      photoImg.src = URL.createObjectURL(blob);
+      await photoImg.decode();
+
+      outputSize.width = photoImg.width;
+      outputSize.height = photoImg.height;
+
+      const photoTexture = new THREE.Texture(photoImg);
+      photoTexture.needsUpdate = true;
+
+      const newInputTextures = this.inputTextures.map((tex) =>
+        tex === this.cameraTexture ? photoTexture : tex
+      );
+      this.material.updateInputTextures(newInputTextures);
+    }
+
+    this.material.setSize(outputSize.width, outputSize.height);
+
+    const blob = await this.exportPng(
+      this.material,
+      outputSize.width,
+      outputSize.height
+    );
     this.saveData(blob);
+
+    this.cameraTexture?.image.play();
     this.material.shouldUpdateUniforms = true;
+    this.material.setSize(this.canvasWidth, this.canvasHeight);
+    this.material.updateInputTextures(this.inputTextures);
     this.setExporting(false);
   }
 
@@ -104,13 +142,13 @@ class CameraManager {
     this.isExporting = isExporting;
   }
 
-  async exportPng(width: number, height: number) {
+  async exportPng(material: THREE.Material, width: number, height: number) {
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     camera.position.z = 1;
     const scene = new THREE.Scene();
     const quad = new THREE.Mesh(
       new THREE.PlaneBufferGeometry(2, 2, 1, 1),
-      this.material
+      material
     );
     scene.add(quad);
 

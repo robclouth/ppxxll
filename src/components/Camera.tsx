@@ -10,7 +10,8 @@ import ShaderManager from "../services/ShaderManager";
 import ImageInputButton from "./ImageInputButton";
 import GLView from "./renderer/GLView";
 import ShaderList from "./ShaderList";
-
+import TuneIcon from "@mui/icons-material/Tune";
+import Parameters from "./Parameters";
 const buttonStyle = {
   color: "white",
   backgroundColor: "rgba(0,0,0,0.2)",
@@ -25,6 +26,7 @@ function Camera() {
   const { activeShader } = ShaderManager;
 
   const [shaderListOpen, setShaderListOpen] = useState(false);
+  const [parametersOpen, setParametersOpen] = useState(false);
 
   function handleShaderListClose() {
     setShaderListOpen(false);
@@ -34,9 +36,21 @@ function Camera() {
     setShaderListOpen(true);
   }
 
-  async function takePicture() {
-    await CameraManager.takePicture(2000, 2000);
+  function handleParametersClose() {
+    setParametersOpen(false);
   }
+
+  function handleParametersPress() {
+    setParametersOpen(true);
+  }
+
+  async function takePicture() {
+    await CameraManager.takePicture();
+  }
+
+  const parameters = activeShader?.passes[0].parameters
+    ? Object.values(activeShader?.passes[0].parameters)
+    : [];
 
   return (
     <FullScreen handle={handle} className="fullscreen">
@@ -61,6 +75,29 @@ function Camera() {
           {activeShader?.passes[0].inputs.map((input, i) => (
             <ImageInputButton key={i} index={i} />
           ))}
+        </Box>
+        <Box
+          component="div"
+          sx={{
+            position: "absolute",
+            bottom: 0,
+            top: 0,
+            right: 0,
+            display: "flex",
+            flexDirection: "column",
+            p: 1,
+            justifyContent: "center",
+          }}
+        >
+          {parameters.length > 0 && (
+            <IconButton
+              size="large"
+              sx={buttonStyle}
+              onClick={handleParametersPress}
+            >
+              <TuneIcon fontSize="inherit" />
+            </IconButton>
+          )}
         </Box>
         <Box
           component="div"
@@ -109,6 +146,7 @@ function Camera() {
           {ShaderManager.activeShader?.name || "None"}
         </Button>
         <ShaderList open={shaderListOpen} onClose={handleShaderListClose} />
+        <Parameters open={parametersOpen} onClose={handleParametersClose} />
       </Box>
     </FullScreen>
   );

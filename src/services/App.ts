@@ -13,6 +13,11 @@ class App {
     y: 0,
   };
 
+  outputSize = {
+    width: 2000,
+    height: 2000,
+  };
+
   constructor() {
     makeAutoObservable(this);
   }

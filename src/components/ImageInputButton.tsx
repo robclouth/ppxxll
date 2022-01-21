@@ -213,7 +213,10 @@ function ImageInputButton({ index }: Props) {
                 key={item.img}
                 onClick={() => handleInputSelect(item.img, "image")}
               >
-                <ImageListItem key={item.img} style={{ height: "100%" }}>
+                <ImageListItem
+                  key={item.img}
+                  style={{ width: "100%", height: "100%" }}
+                >
                   <img
                     src={`${item.img}?w=300&h=300&auto=format`}
                     srcSet={`${item.img}?w=300&auto=format&dpr=2 2x`}

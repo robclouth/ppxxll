@@ -2,14 +2,13 @@ import { Box } from "@mui/material";
 import { AdaptiveDpr, OrthographicCamera } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { observer } from "mobx-react";
+import { useEffect } from "react";
+import useResizeObserver from "use-resize-observer";
 import App from "../../services/App";
 import CameraManager from "../../services/CameraManager";
 
 const ShaderQuad = observer(() => {
-  const { size } = useThree();
   const { material } = CameraManager;
-
-  useFrame(() => material?.resize(size.width, size.height));
 
   return (
     <mesh material={material}>
@@ -19,7 +18,6 @@ const ShaderQuad = observer(() => {
 });
 
 function handlePointerDown(e: any) {
-  // e.preventDefault();
   if (e.changedTouches?.[0])
     App.setPointerDown(
       e.changedTouches?.[0].pageX,
@@ -29,14 +27,12 @@ function handlePointerDown(e: any) {
 }
 
 function handlePointerUp(e: any) {
-  // e.preventDefault();
   if (e.changedTouches?.[0])
     App.setPointerUp(e.changedTouches?.[0].pageX, e.changedTouches?.[0].pageY);
   else App.setPointerUp(e.pageX, e.pageY);
 }
 
 function handlePointerMove(e: any) {
-  // e.preventDefault();
   if (e.changedTouches?.[0])
     App.setPointerPosition(
       e.changedTouches?.[0].pageX,
@@ -46,6 +42,12 @@ function handlePointerMove(e: any) {
 }
 
 function GLView() {
+  const { ref, width = 1, height = 1 } = useResizeObserver<HTMLCanvasElement>();
+
+  useEffect(() => {
+    CameraManager.setCanvasSize(width, height);
+  }, [width, height]);
+
   return (
     <Box
       component="div"
@@ -60,6 +62,7 @@ function GLView() {
       sx={{ touchAction: "none" }}
     >
       <Canvas
+        ref={ref}
         frameloop={CameraManager.isExporting ? "demand" : "always"}
         linear
         flat
