@@ -5,19 +5,21 @@ import ShaderToyMaterial from "../components/renderer/ShaderToyMaterial";
 import { Shader } from "./ShaderManager";
 import App from "./App";
 
-const chunkWidth = 1000;
-const chunkHeight = 1000;
+const chunkWidth = 500;
+const chunkHeight = 500;
 
 class CameraManager {
   material: ShaderToyMaterial;
 
-  isExporting = false;
-  exportProgress = 0;
+  isTakingPicture = false;
+  photoProgress = 0;
   viewport!: Viewport;
 
   imageCapture?: ImageCapture;
   mediaStream?: MediaStream;
   cameraTexture?: THREE.VideoTexture;
+  latestPhotoUrl?: string;
+  latestPhotoBlob?: Blob;
 
   canvasWidth = 0;
   canvasHeight = 0;
@@ -153,7 +155,7 @@ class CameraManager {
     this.canvasWidth = width;
     this.canvasHeight = height;
 
-    if (!this.isExporting) this.material?.setSize(width, height);
+    if (!this.isTakingPicture) this.material?.setSize(width, height);
   }
 
   setInputTexture(index: number, texture?: THREE.Texture) {
@@ -166,8 +168,8 @@ class CameraManager {
 
     const outputSize = App.outputSize;
 
-    this.setExporting(true);
-    this.exportProgress = 0;
+    this.isTakingPicture = true;
+    this.photoProgress = 0;
 
     this.cameraTexture?.image.pause();
     this.material.shouldUpdateUniforms = false;
@@ -197,17 +199,14 @@ class CameraManager {
       outputSize.width,
       outputSize.height
     );
-    this.saveData(blob);
+    this.latestPhotoBlob = blob;
+    this.latestPhotoUrl = URL.createObjectURL(blob);
 
     this.cameraTexture?.image.play();
     this.material.shouldUpdateUniforms = true;
     this.material.setSize(this.canvasWidth, this.canvasHeight);
     this.material.updateInputTextures(this.inputTextures);
-    this.setExporting(false);
-  }
-
-  setExporting(isExporting: boolean) {
-    this.isExporting = isExporting;
+    this.isTakingPicture = false;
   }
 
   async exportPng(material: THREE.Material, width: number, height: number) {
@@ -256,7 +255,8 @@ class CameraManager {
         });
       }
 
-      this.exportProgress = (chunkY + chunkHeight) / height;
+      this.photoProgress = (chunkY + chunkHeight) / height;
+      console.log(this.photoProgress);
 
       await this.wait();
     }
@@ -322,15 +322,37 @@ class CameraManager {
     };
   }
 
-  saveData(blob: Blob) {
-    const url = URL.createObjectURL(blob);
+  shareLatestPhoto() {
+    if (!this.latestPhotoBlob) return;
+
+    const filename = `${new Date().getTime()}.png`;
+    const files = [
+      new File([this.latestPhotoBlob], filename, {
+        type: "image/png",
+        lastModified: new Date().getTime(),
+      }),
+    ];
+
+    if (navigator.canShare && navigator.canShare({ files })) {
+      const shareData = {
+        files,
+      };
+      navigator.share(shareData);
+    } else throw "Share not available";
+  }
+
+  downloadLatestPhoto() {
+    if (!this.latestPhotoUrl) return;
+
+    const filename = `${new Date().getTime()}.png`;
+
     const a = document.createElement<any>("a");
     document.body.appendChild(a);
     a.style = "display: none";
-    a.href = URL.createObjectURL(blob);
-    a.download = "test.png";
+    a.href = this.latestPhotoUrl;
+    a.download = filename;
     a.click();
-    URL.revokeObjectURL(url);
+
     document.body.removeChild(a);
   }
 }

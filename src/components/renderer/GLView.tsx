@@ -1,6 +1,6 @@
 import { Box } from "@mui/material";
 import { AdaptiveDpr, OrthographicCamera } from "@react-three/drei";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas } from "@react-three/fiber";
 import { observer } from "mobx-react";
 import { useEffect } from "react";
 import useResizeObserver from "use-resize-observer";
@@ -63,7 +63,7 @@ function GLView() {
     >
       <Canvas
         ref={ref}
-        frameloop={CameraManager.isExporting ? "demand" : "always"}
+        frameloop={CameraManager.isTakingPicture ? "demand" : "always"}
         linear
         flat
         dpr={[0.25, window.devicePixelRatio]}

@@ -2,8 +2,14 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
-import { Box, Button, IconButton } from "@mui/material";
-import { useState } from "react";
+import {
+  Backdrop,
+  Box,
+  Button,
+  CircularProgress,
+  IconButton,
+} from "@mui/material";
+import { useEffect, useState } from "react";
 import { FullScreen, useFullScreenHandle } from "react-full-screen";
 import CameraManager from "../services/CameraManager";
 import ShaderManager from "../services/ShaderManager";
@@ -13,6 +19,8 @@ import ShaderList from "./ShaderList";
 import TuneIcon from "@mui/icons-material/Tune";
 import Parameters from "./Parameters";
 import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
+import { observer } from "mobx-react";
+import PhotoPreview from "./PhotoPreview";
 
 const buttonStyle = {
   color: "white",
@@ -22,13 +30,26 @@ const buttonStyle = {
   },
 };
 
+const buttonContainerStyle = {
+  flex: 1,
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+};
+
 function Camera() {
   const handle = useFullScreenHandle();
 
   const { activeShader } = ShaderManager;
+  const { latestPhotoUrl } = CameraManager;
 
   const [shaderListOpen, setShaderListOpen] = useState(false);
   const [parametersOpen, setParametersOpen] = useState(false);
+  const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    latestPhotoUrl && setPhotoPreviewOpen(true);
+  }, [latestPhotoUrl]);
 
   function handleShaderListClose() {
     setShaderListOpen(false);
@@ -44,6 +65,10 @@ function Camera() {
 
   function handleParametersPress() {
     setParametersOpen(true);
+  }
+
+  function handlePhotoPreviewClose() {
+    setPhotoPreviewOpen(false);
   }
 
   async function handleTakePicturePress() {
@@ -108,29 +133,41 @@ function Camera() {
             justifyContent: "space-between",
           }}
         >
-          <IconButton
-            size="large"
-            sx={buttonStyle}
-            onClick={handleSwitchCameraPress}
+          <Box
+            component="div"
+            sx={{ ...buttonContainerStyle, justifyContent: "flex-start" }}
           >
-            <CameraswitchIcon fontSize="inherit" />
-          </IconButton>
-          <IconButton
-            size="large"
-            sx={buttonStyle}
-            onClick={handleTakePicturePress}
-          >
-            <PhotoCameraIcon fontSize="inherit" />
-          </IconButton>
-          {parameters.length > 0 && (
             <IconButton
               size="large"
               sx={buttonStyle}
-              onClick={handleParametersPress}
+              onClick={handleSwitchCameraPress}
             >
-              <TuneIcon fontSize="inherit" />
+              <CameraswitchIcon fontSize="inherit" />
             </IconButton>
-          )}
+          </Box>
+          <Box component="div" sx={buttonContainerStyle}>
+            <IconButton
+              size="large"
+              sx={buttonStyle}
+              onClick={handleTakePicturePress}
+            >
+              <PhotoCameraIcon fontSize="inherit" />
+            </IconButton>
+          </Box>
+          <Box
+            component="div"
+            sx={{ ...buttonContainerStyle, justifyContent: "flex-end" }}
+          >
+            {parameters.length > 0 && (
+              <IconButton
+                size="large"
+                sx={buttonStyle}
+                onClick={handleParametersPress}
+              >
+                <TuneIcon fontSize="inherit" />
+              </IconButton>
+            )}
+          </Box>
         </Box>
         <IconButton
           size="large"
@@ -163,9 +200,20 @@ function Camera() {
         </Button>
         <ShaderList open={shaderListOpen} onClose={handleShaderListClose} />
         <Parameters open={parametersOpen} onClose={handleParametersClose} />
+        <PhotoPreview
+          open={photoPreviewOpen}
+          onClose={handlePhotoPreviewClose}
+        />
+        <Backdrop open={CameraManager.isTakingPicture}>
+          <CircularProgress
+            color="inherit"
+            variant="determinate"
+            value={CameraManager.photoProgress * 100}
+          />
+        </Backdrop>
       </Box>
     </FullScreen>
   );
 }
 
-export default Camera;
+export default observer(Camera);
