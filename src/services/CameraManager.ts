@@ -83,7 +83,7 @@ class CameraManager {
     });
   }
 
-  async startVideoCapture() {
+  async startVideoCapture(preview = true) {
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach((track) => {
         track.stop();
@@ -95,6 +95,8 @@ class CameraManager {
     const constraints = {
       audio: false,
       video: {
+        width: { ideal: preview ? 1200 : 4000 },
+        height: { ideal: preview ? 1200 * 0.75 : 3000 },
         deviceId: {
           exact:
             this.activeCamera === "front"
@@ -109,6 +111,8 @@ class CameraManager {
     const mediaStreamTrack = this.mediaStream.getVideoTracks()[0];
     let { width, height } = mediaStreamTrack.getSettings();
 
+    console.log(`Stream res: ${width}:${height}`);
+
     const videoElement = document.createElement("video");
     videoElement.srcObject = this.mediaStream;
     videoElement.muted = true;
@@ -117,12 +121,10 @@ class CameraManager {
     videoElement.playsInline = true;
     videoElement.width = width!;
     videoElement.height = height!;
-    videoElement.play();
+    await videoElement.play();
 
     const previousCameraTexture = this.cameraTexture;
     this.cameraTexture = new THREE.VideoTexture(videoElement);
-
-    this.imageCapture = new ImageCapture(mediaStreamTrack);
 
     if (previousCameraTexture)
       this.inputTextures = this.inputTextures.map((texture) =>
@@ -130,6 +132,13 @@ class CameraManager {
       );
 
     if (this.material) this.material.updateInputTextures(this.inputTextures);
+  }
+
+  setPreviewActive(active: boolean) {
+    if (this.cameraTexture?.image) {
+      if (active) this.cameraTexture.image.play();
+      else this.cameraTexture.image.pause();
+    }
   }
 
   switchCamera() {
@@ -145,9 +154,9 @@ class CameraManager {
     this.material.updateInputTextures(this.inputTextures);
   }
 
-  wait() {
+  wait(ms = 0) {
     return new Promise((resolve) => {
-      setTimeout(resolve);
+      setTimeout(resolve, ms);
     });
   }
 
@@ -174,26 +183,18 @@ class CameraManager {
     this.cameraTexture?.image.pause();
     this.material.shouldUpdateUniforms = false;
 
-    if (this.imageCapture) {
-      const blob = await this.imageCapture.takePhoto();
-      const photoImg = document.createElement("img");
-      photoImg.src = URL.createObjectURL(blob);
-      await photoImg.decode();
+    if (this.mediaStream) {
+      await this.startVideoCapture(false);
+      await this.wait(500);
+      this.cameraTexture?.image.pause();
 
-      outputSize.width = photoImg.width;
-      outputSize.height = photoImg.height;
-
-      const photoTexture = new THREE.Texture(photoImg);
-      photoTexture.needsUpdate = true;
-
-      const newInputTextures = this.inputTextures.map((tex) =>
-        tex === this.cameraTexture ? photoTexture : tex
-      );
-      this.material.updateInputTextures(newInputTextures);
+      const mediaStreamTrack = this.mediaStream.getVideoTracks()[0];
+      let { width, height } = mediaStreamTrack.getSettings();
+      outputSize.width = width!;
+      outputSize.height = height!;
     }
 
     this.material.setSize(outputSize.width, outputSize.height);
-
     const blob = await this.exportPng(
       this.material,
       outputSize.width,
@@ -202,10 +203,12 @@ class CameraManager {
     this.latestPhotoBlob = blob;
     this.latestPhotoUrl = URL.createObjectURL(blob);
 
-    this.cameraTexture?.image.play();
+    await this.startVideoCapture(true);
+
     this.material.shouldUpdateUniforms = true;
     this.material.setSize(this.canvasWidth, this.canvasHeight);
     this.material.updateInputTextures(this.inputTextures);
+
     this.isTakingPicture = false;
   }
 

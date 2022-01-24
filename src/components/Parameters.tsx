@@ -1,25 +1,6 @@
-import AddIcon from "@mui/icons-material/Add";
-import CheckIcon from "@mui/icons-material/Check";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import {
-  AppBar,
-  Box,
-  Dialog,
-  Drawer,
-  IconButton,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Slide,
-  Slider,
-  SwipeableDrawer,
-  Toolbar,
-  Typography,
-} from "@mui/material";
+import { Box, Drawer } from "@mui/material";
 import { observer } from "mobx-react";
-import { forwardRef } from "react";
-import ShaderManager, { Parameter, Shader } from "../services/ShaderManager";
+import ShaderManager, { Parameter } from "../services/ShaderManager";
 import ParameterSlider from "./ParameterSlider";
 
 interface Props {
@@ -69,6 +50,7 @@ function Parameters({ open, onClose }: Props) {
           backgroundColor: "transparent",
         },
       }}
+      container={document.getElementById("cameraView")}
     >
       <Box
         component="div"

@@ -37,6 +37,20 @@ const buttonContainerStyle = {
   alignItems: "center",
 };
 
+const Progress = observer(() => {
+  const { photoProgress } = CameraManager;
+
+  return (
+    <Backdrop open={CameraManager.isTakingPicture}>
+      <CircularProgress
+        color="inherit"
+        variant="determinate"
+        value={Math.min(photoProgress * 100, 100)}
+      />
+    </Backdrop>
+  );
+});
+
 function Camera() {
   const handle = useFullScreenHandle();
 
@@ -50,6 +64,10 @@ function Camera() {
   useEffect(() => {
     latestPhotoUrl && setPhotoPreviewOpen(true);
   }, [latestPhotoUrl]);
+
+  useEffect(() => {
+    CameraManager.setPreviewActive(!(shaderListOpen || photoPreviewOpen));
+  }, [shaderListOpen, photoPreviewOpen]);
 
   function handleShaderListClose() {
     setShaderListOpen(false);
@@ -204,13 +222,7 @@ function Camera() {
           open={photoPreviewOpen}
           onClose={handlePhotoPreviewClose}
         />
-        <Backdrop open={CameraManager.isTakingPicture}>
-          <CircularProgress
-            color="inherit"
-            variant="determinate"
-            value={CameraManager.photoProgress * 100}
-          />
-        </Backdrop>
+        <Progress />
       </Box>
     </FullScreen>
   );
