@@ -41,97 +41,101 @@ class CameraManager {
   }
 
   async init() {
-    try {
-      await this.detectCameras();
-      await this.startVideoCapture();
+    await this.detectCameras();
+    await this.startVideoCapture();
 
-      this.setInputTexture(0, this.cameraTexture);
-    } catch (error) {
-      console.error("enumerateDevices() error:", error);
-    }
+    if (this.cameraTexture) this.setInputTexture(0, this.cameraTexture);
   }
 
   async detectCameras() {
-    const tempStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-    });
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    let frontDeviceId;
-    let backDeviceId;
-    if (devices.length > 0) {
-      /* defaults so all this will work on a desktop */
-      frontDeviceId = devices[0].deviceId;
-      backDeviceId = devices[0].deviceId;
-    }
-    /* look for front and back devices */
-    devices.forEach((device) => {
-      if (device.kind === "videoinput") {
-        if (device.label && device.label.length > 0) {
-          if (device.label.toLowerCase().indexOf("back") >= 0)
-            backDeviceId = device.deviceId;
-          else if (device.label.toLowerCase().indexOf("front") >= 0)
-            frontDeviceId = device.deviceId;
-        }
+    try {
+      const tempStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+      });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      let frontDeviceId;
+      let backDeviceId;
+      if (devices.length > 0) {
+        /* defaults so all this will work on a desktop */
+        frontDeviceId = devices[0].deviceId;
+        backDeviceId = devices[0].deviceId;
       }
-    });
+      /* look for front and back devices */
+      devices.forEach((device) => {
+        if (device.kind === "videoinput") {
+          if (device.label && device.label.length > 0) {
+            if (device.label.toLowerCase().indexOf("back") >= 0)
+              backDeviceId = device.deviceId;
+            else if (device.label.toLowerCase().indexOf("front") >= 0)
+              frontDeviceId = device.deviceId;
+          }
+        }
+      });
 
-    this.frontCameraDeviceId = frontDeviceId;
-    this.backCameraDeviceId = backDeviceId;
+      this.frontCameraDeviceId = frontDeviceId;
+      this.backCameraDeviceId = backDeviceId;
 
-    tempStream.getTracks().forEach((track) => {
-      track.stop();
-    });
+      tempStream.getTracks().forEach((track) => {
+        track.stop();
+      });
+    } catch (error) {
+      console.error(`Unable to get cameras: ${error}`);
+    }
   }
 
   async startVideoCapture(preview = true) {
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => {
-        track.stop();
-      });
-    }
+    try {
+      if (this.mediaStream) {
+        this.mediaStream.getTracks().forEach((track) => {
+          track.stop();
+        });
+      }
 
-    if (this.cameraTexture) this.cameraTexture.dispose();
+      if (this.cameraTexture) this.cameraTexture.dispose();
 
-    const constraints = {
-      audio: false,
-      video: {
-        width: { ideal: preview ? 1200 : 4000 },
-        height: { ideal: preview ? 1200 * 0.75 : 3000 },
-        deviceId: {
-          exact:
-            this.activeCamera === "front"
-              ? this.frontCameraDeviceId
-              : this.backCameraDeviceId,
+      const constraints = {
+        audio: false,
+        video: {
+          width: { ideal: preview ? 1200 : 4000 },
+          height: { ideal: preview ? 1200 * 0.75 : 3000 },
+          deviceId: {
+            exact:
+              this.activeCamera === "front"
+                ? this.frontCameraDeviceId
+                : this.backCameraDeviceId,
+          },
         },
-      },
-    };
+      };
 
-    this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
 
-    const mediaStreamTrack = this.mediaStream.getVideoTracks()[0];
-    let { width, height } = mediaStreamTrack.getSettings();
+      const mediaStreamTrack = this.mediaStream.getVideoTracks()[0];
+      let { width, height } = mediaStreamTrack.getSettings();
 
-    console.log(`Stream res: ${width}:${height}`);
+      console.log(`Stream res: ${width}:${height}`);
 
-    const videoElement = document.createElement("video");
-    videoElement.srcObject = this.mediaStream;
-    videoElement.muted = true;
-    videoElement.controls = false;
-    videoElement.autoplay = true;
-    videoElement.playsInline = true;
-    videoElement.width = width!;
-    videoElement.height = height!;
-    await videoElement.play();
+      const videoElement = document.createElement("video");
+      videoElement.srcObject = this.mediaStream;
+      videoElement.muted = true;
+      videoElement.controls = false;
+      videoElement.autoplay = true;
+      videoElement.playsInline = true;
+      videoElement.width = width!;
+      videoElement.height = height!;
+      await videoElement.play();
 
-    const previousCameraTexture = this.cameraTexture;
-    this.cameraTexture = new THREE.VideoTexture(videoElement);
+      const previousCameraTexture = this.cameraTexture;
+      this.cameraTexture = new THREE.VideoTexture(videoElement);
 
-    if (previousCameraTexture)
-      this.inputTextures = this.inputTextures.map((texture) =>
-        texture === previousCameraTexture ? this.cameraTexture : texture
-      );
+      if (previousCameraTexture)
+        this.inputTextures = this.inputTextures.map((texture) =>
+          texture === previousCameraTexture ? this.cameraTexture : texture
+        );
 
-    if (this.material) this.material.updateInputTextures(this.inputTextures);
+      if (this.material) this.material.updateInputTextures(this.inputTextures);
+    } catch (error) {
+      console.error(`Unable to start camera: ${error}`);
+    }
   }
 
   setPreviewActive(active: boolean) {

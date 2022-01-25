@@ -1,6 +1,7 @@
 import { makeAutoObservable } from "mobx";
 import CameraManager from "./CameraManager";
 import ShaderManager from "./ShaderManager";
+import TextureManager from "./TextureManager";
 
 class App {
   isPointerDown = false;
@@ -23,8 +24,11 @@ class App {
   }
 
   async init() {
-    await ShaderManager.init();
-    await CameraManager.init();
+    await Promise.all([
+      ShaderManager.init(),
+      CameraManager.init(),
+      TextureManager.init(),
+    ]);
   }
 
   setPointerDown(x: number, y: number) {
