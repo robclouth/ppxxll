@@ -22,7 +22,9 @@ class TextureManager {
     this.textures.push(url);
   }
 
-  async addTextureFromFile(file: File) {}
+  async deleteTexture(urlToDelete: string) {
+    this.textures = this.textures.filter((url) => url !== urlToDelete);
+  }
 }
 
 export default new TextureManager();

@@ -209,6 +209,7 @@ function Camera() {
             position: "absolute",
             top: 10,
             left: 10,
+            maxWidth: "50%",
             ...buttonStyle,
           }}
           onClick={handleShaderListPress}

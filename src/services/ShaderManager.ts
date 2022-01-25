@@ -1,5 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import CameraManager from "./CameraManager";
+import { isPersisting, makePersistable } from "mobx-persist-store";
+import localForage from "localforage";
 
 const supportedTypes = ["float"];
 
@@ -53,11 +55,20 @@ class ShaderManager {
   }
 
   async init() {
-    await Promise.all([
-      this.addShaderToyShader("ftKSWz"),
-      this.addShaderToyShader("NsfcWf"),
-      this.addShaderToyShader("fdscD2"),
-    ]);
+    await makePersistable(this, {
+      name: "Shaders",
+      properties: ["shaders"],
+      storage: localForage,
+      stringify: false,
+    });
+
+    if (Object.keys(this.shaders).length === 0) {
+      await Promise.all([
+        this.addShaderToyShader("ftKSWz"),
+        this.addShaderToyShader("NsfcWf"),
+        this.addShaderToyShader("fdscD2"),
+      ]);
+    }
   }
 
   async addShaderToyShader(id: string) {
@@ -91,6 +102,10 @@ class ShaderManager {
         })),
       };
     });
+  }
+
+  deleteShader(id: string) {
+    delete this.shaders[id];
   }
 
   setShader(shader: Shader) {

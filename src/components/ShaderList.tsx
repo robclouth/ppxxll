@@ -3,19 +3,27 @@ import CheckIcon from "@mui/icons-material/Check";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import {
   AppBar,
+  Button,
   Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   List,
   ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Slide,
+  TextField,
   Toolbar,
   Typography,
 } from "@mui/material";
 import { observer } from "mobx-react";
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
 import ShaderManager, { Shader } from "../services/ShaderManager";
+import TextureManager from "../services/TextureManager";
+import ItemMenu from "./ItemMenu";
 
 const Transition = forwardRef<any>(function Transition(props: any, ref: any) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -27,6 +35,10 @@ interface Props {
 }
 
 function ShaderList({ open, onClose }: Props) {
+  const [addTextureOpen, setAddTextureOpen] = useState(false);
+  const [shaderToyId, setShaderToyId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
   function handleClose() {
     onClose();
   }
@@ -36,6 +48,32 @@ function ShaderList({ open, onClose }: Props) {
     handleClose();
   }
 
+  function handleAddShaderOpen() {
+    setAddTextureOpen(true);
+  }
+
+  function handleAddShaderClose() {
+    setAddTextureOpen(false);
+  }
+
+  async function handleShaderToyIdInputBlur(url: string) {
+    setShaderToyId(url);
+  }
+
+  async function handleAddPress() {
+    try {
+      setError("");
+      await ShaderManager.addShaderToyShader(shaderToyId!);
+      handleAddShaderClose();
+    } catch (err) {
+      setError("Unable to get shader");
+    }
+  }
+
+  function handleShaderDelete(id: string) {
+    ShaderManager.deleteShader(id);
+  }
+
   return (
     <Dialog
       container={document.getElementById("cameraView")}
@@ -43,6 +81,7 @@ function ShaderList({ open, onClose }: Props) {
       open={open}
       onClose={handleClose}
       TransitionComponent={Transition as any}
+      keepMounted
     >
       <AppBar sx={{ position: "relative" }}>
         <Toolbar>
@@ -60,7 +99,7 @@ function ShaderList({ open, onClose }: Props) {
           <IconButton
             edge="end"
             color="inherit"
-            onClick={handleClose}
+            onClick={handleAddShaderOpen}
             aria-label="close"
           >
             <AddIcon />
@@ -71,22 +110,54 @@ function ShaderList({ open, onClose }: Props) {
         {Object.values(ShaderManager.shaders).map((shader) => (
           <ListItem
             key={shader.id}
-            button
-            onClick={() => handleSelectShader(shader)}
+            disableGutters
+            disablePadding
+            secondaryAction={
+              <ItemMenu
+                options={["Delete"]}
+                onSelect={(index) => {
+                  if (index === 0) handleShaderDelete(shader.id);
+                }}
+              />
+            }
           >
             {ShaderManager.activeShader === shader && (
               <ListItemIcon>
                 <CheckIcon />
               </ListItemIcon>
             )}
-            <ListItemText
-              inset={ShaderManager.activeShader !== shader}
-              primary={shader.name}
-              secondary={shader.description}
-            />
+            <ListItemButton onClick={() => handleSelectShader(shader)}>
+              <ListItemText
+                inset={ShaderManager.activeShader !== shader}
+                primary={shader.name}
+                secondary={shader.description}
+              />
+            </ListItemButton>
           </ListItem>
         ))}
       </List>
+      <Dialog open={addTextureOpen} onClose={handleAddShaderClose}>
+        <DialogTitle>Add Shader</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            id="name"
+            fullWidth
+            variant="standard"
+            placeholder="ShaderToy ID"
+            sx={{ mb: 1 }}
+            onChange={(e) => handleShaderToyIdInputBlur(e.target.value)}
+            error={!!error}
+            helperText={error}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleAddShaderClose}>Cancel</Button>
+          <Button onClick={handleAddPress} disabled={!shaderToyId}>
+            Add
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

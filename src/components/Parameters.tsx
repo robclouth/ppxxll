@@ -51,6 +51,7 @@ function Parameters({ open, onClose }: Props) {
         },
       }}
       container={document.getElementById("cameraView")}
+      keepMounted
     >
       <Box
         component="div"

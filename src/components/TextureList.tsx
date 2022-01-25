@@ -24,6 +24,7 @@ import AddIcon from "@mui/icons-material/Add";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import CameraManager from "../services/CameraManager";
 import TextureManager from "../services/TextureManager";
+import ItemMenu from "./ItemMenu";
 
 const Transition = forwardRef<any>(function Transition(props: any, ref: any) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -98,6 +99,10 @@ function TextureList({ open, onClose, onTextureSelect }: Props) {
     handleAddTextureClose();
   }
 
+  function handleTextureDelete(url: string) {
+    TextureManager.deleteTexture(url);
+  }
+
   return (
     <Dialog
       container={document.getElementById("cameraView")}
@@ -105,6 +110,7 @@ function TextureList({ open, onClose, onTextureSelect }: Props) {
       open={open}
       onClose={handleClose}
       TransitionComponent={Transition as any}
+      keepMounted
     >
       <AppBar sx={{ position: "relative" }}>
         <Toolbar>
@@ -148,14 +154,26 @@ function TextureList({ open, onClose, onTextureSelect }: Props) {
             </ButtonBase>
           )}
           {textures.map((url, i) => (
-            <ButtonBase key={url} onClick={() => onTextureSelect(url, "image")}>
-              <ImageListItem
+            <ImageListItem key={url} style={{ width: "100%", height: "100%" }}>
+              <ButtonBase
                 key={url}
-                style={{ width: "100%", height: "100%" }}
+                onClick={() => onTextureSelect(url, "image")}
+                sx={{ width: "100%", height: "100%" }}
               >
-                <img src={url} loading="lazy" />
-              </ImageListItem>
-            </ButtonBase>
+                <img
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  src={url}
+                  loading="lazy"
+                />
+              </ButtonBase>
+              <ItemMenu
+                options={["Delete"]}
+                onSelect={(index) => {
+                  if (index === 0) handleTextureDelete(url);
+                }}
+                sx={{ position: "absolute", top: 0, right: 0, m: 0 }}
+              />
+            </ImageListItem>
           ))}
         </ImageList>
       </Box>
@@ -185,7 +203,6 @@ function TextureList({ open, onClose, onTextureSelect }: Props) {
           <TextField
             autoFocus
             id="name"
-            type="email"
             fullWidth
             variant="standard"
             placeholder="Add from URL"
