@@ -1,14 +1,22 @@
 import { Box } from "@mui/material";
 import { AdaptiveDpr, OrthographicCamera } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { observer } from "mobx-react";
 import { useEffect } from "react";
-import useResizeObserver from "use-resize-observer";
 import App from "../../services/App";
 import CameraManager from "../../services/CameraManager";
 
 const ShaderQuad = observer(() => {
   const { material } = CameraManager;
+  const { gl, size } = useThree();
+
+  useEffect(() => {
+    CameraManager.setPreviewCanvas(gl.domElement);
+  }, [gl.domElement]);
+
+  useEffect(() => {
+    CameraManager.setPreviewCanvasSize(size.width, size.height);
+  }, [size.width, size.height]);
 
   return (
     <mesh material={material}>
@@ -42,12 +50,6 @@ function handlePointerMove(e: any) {
 }
 
 function GLView() {
-  const { ref, width = 1, height = 1 } = useResizeObserver<HTMLCanvasElement>();
-
-  useEffect(() => {
-    CameraManager.setCanvasSize(width, height);
-  }, [width, height]);
-
   return (
     <Box
       component="div"
@@ -62,7 +64,6 @@ function GLView() {
       sx={{ touchAction: "none" }}
     >
       <Canvas
-        ref={ref}
         frameloop={CameraManager.isTakingPicture ? "demand" : "always"}
         linear
         flat

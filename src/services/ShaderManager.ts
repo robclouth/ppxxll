@@ -31,7 +31,7 @@ export type Pass = {
 
 export type Shader = {
   id: string;
-  name: string;
+  title: string;
   description: string;
   author: string;
   passes: Pass[];
@@ -57,51 +57,62 @@ class ShaderManager {
   async init() {
     await makePersistable(this, {
       name: "Shaders",
-      properties: ["shaders"],
+      properties: ["shaders", "activeShader"],
       storage: localForage,
       stringify: false,
     });
 
     if (Object.keys(this.shaders).length === 0) {
       await Promise.all([
-        this.addShaderToyShader("ftKSWz"),
         this.addShaderToyShader("NsfcWf"),
         this.addShaderToyShader("fdscD2"),
+        this.addShaderToyShader("Ns2cz1"),
+        this.addShaderToyShader("tlyBDG"),
       ]);
     }
   }
 
   async addShaderToyShader(id: string) {
-    const json = await (
-      await fetch(`https://www.shadertoy.com/api/v1/shaders/${id}?key=fd8K4m`)
-    ).json();
+    try {
+      const json = await (
+        await fetch(`https://www.shadertoy.com/api/v1/shaders/${id}?key=fd8K4m`)
+      ).json();
 
-    if (json.Shader.renderpass.length > 1)
-      throw "Multi-pass shaders not yet supported";
+      if (json.Error) throw json.Error;
 
-    runInAction(() => {
-      const info = json.Shader.info;
+      if (json.Shader.renderpass.length > 1)
+        throw "Multi-pass shaders not yet supported";
 
-      this.shaders[info.id] = {
-        id: info.id,
-        name: info.name,
-        description: info.description,
-        author: info.username,
-        passes: json.Shader.renderpass.map((pass: any) => ({
-          ...this.parseParameters(pass.code),
-          inputs: pass.inputs.map((input: any) => ({
-            id: input.id.toString(),
-            type: ctypeToType[input.ctype],
-            src: input.src,
+      runInAction(() => {
+        const info = json.Shader.info;
+
+        const { title, author } = this.extractMetadata(
+          json.Shader.renderpass[0].code
+        );
+
+        this.shaders[info.id] = {
+          id: info.id,
+          title: title || info.name,
+          description: info.description,
+          author: author || info.username,
+          passes: json.Shader.renderpass.map((pass: any) => ({
+            ...this.extractParameters(pass.code),
+            inputs: pass.inputs.map((input: any) => ({
+              id: input.id.toString(),
+              type: ctypeToType[input.ctype],
+              src: input.src,
+            })),
+            outputs: pass.outputs.map((input: any) => ({
+              id: input.id.toString(),
+              type: [input.ctype],
+              src: input.src,
+            })),
           })),
-          outputs: pass.outputs.map((input: any) => ({
-            id: input.id.toString(),
-            type: [input.ctype],
-            src: input.src,
-          })),
-        })),
-      };
-    });
+        };
+      });
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   deleteShader(id: string) {
@@ -113,7 +124,14 @@ class ShaderManager {
     CameraManager.setShader(this.activeShader);
   }
 
-  parseParameters(code: string) {
+  extractMetadata(code: string) {
+    const titleMatch = code.match(/@title (.+)/);
+    const authorMatch = code.match(/@author (.+)/);
+
+    return { title: titleMatch?.[1], author: authorMatch?.[1] };
+  }
+
+  extractParameters(code: string) {
     const matches = Array.from(code.matchAll(parameterPattern));
 
     const parameters: { [name: string]: Parameter } = {};

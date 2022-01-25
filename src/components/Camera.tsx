@@ -21,6 +21,7 @@ import Parameters from "./Parameters";
 import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
 import { observer } from "mobx-react";
 import PhotoPreview from "./PhotoPreview";
+import VideoPreview from "./VideoPreview";
 
 const buttonStyle = {
   color: "white",
@@ -55,19 +56,26 @@ function Camera() {
   const handle = useFullScreenHandle();
 
   const { activeShader } = ShaderManager;
-  const { latestPhotoUrl } = CameraManager;
+  const { latestPhotoUrl, latestVideoUrl } = CameraManager;
 
   const [shaderListOpen, setShaderListOpen] = useState(false);
   const [parametersOpen, setParametersOpen] = useState(false);
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
+  const [videoPreviewOpen, setVideoPreviewOpen] = useState(false);
 
   useEffect(() => {
     latestPhotoUrl && setPhotoPreviewOpen(true);
   }, [latestPhotoUrl]);
 
   useEffect(() => {
-    CameraManager.setPreviewActive(!(shaderListOpen || photoPreviewOpen));
-  }, [shaderListOpen, photoPreviewOpen]);
+    latestVideoUrl && setVideoPreviewOpen(true);
+  }, [latestVideoUrl]);
+
+  useEffect(() => {
+    CameraManager.setPreviewActive(
+      !(shaderListOpen || photoPreviewOpen || videoPreviewOpen)
+    );
+  }, [shaderListOpen, photoPreviewOpen, videoPreviewOpen]);
 
   function handleShaderListClose() {
     setShaderListOpen(false);
@@ -89,8 +97,16 @@ function Camera() {
     setPhotoPreviewOpen(false);
   }
 
+  function handleVideoPreviewClose() {
+    setVideoPreviewOpen(false);
+  }
+
   async function handleTakePicturePress() {
-    await CameraManager.takePicture();
+    if (CameraManager.mode === "photo") await CameraManager.takePicture();
+    else {
+      if (!CameraManager.isRecording) CameraManager.startRecording();
+      else CameraManager.stopRecording();
+    }
   }
 
   function handleSwitchCameraPress() {
@@ -215,13 +231,17 @@ function Camera() {
           onClick={handleShaderListPress}
           endIcon={<KeyboardArrowDownIcon />}
         >
-          {ShaderManager.activeShader?.name || "None"}
+          {ShaderManager.activeShader?.title || "None"}
         </Button>
         <ShaderList open={shaderListOpen} onClose={handleShaderListClose} />
         <Parameters open={parametersOpen} onClose={handleParametersClose} />
         <PhotoPreview
           open={photoPreviewOpen}
           onClose={handlePhotoPreviewClose}
+        />
+        <VideoPreview
+          open={videoPreviewOpen}
+          onClose={handleVideoPreviewClose}
         />
         <Progress />
       </Box>

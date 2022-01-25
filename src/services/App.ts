@@ -19,6 +19,8 @@ class App {
     height: 1000,
   };
 
+  outputFps = 30;
+
   constructor() {
     makeAutoObservable(this);
   }

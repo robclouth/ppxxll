@@ -11,9 +11,11 @@ type Props = {
 export default function ItemMenu({ options, onSelect, sx }: Props) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
+
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
+
   const handleClose = () => {
     setAnchorEl(null);
   };
@@ -42,7 +44,13 @@ export default function ItemMenu({ options, onSelect, sx }: Props) {
         container={document.getElementById("cameraView")}
       >
         {options.map((option, i) => (
-          <MenuItem key={option} onClick={() => onSelect(i)}>
+          <MenuItem
+            key={option}
+            onClick={() => {
+              onSelect(i);
+              handleClose();
+            }}
+          >
             {option}
           </MenuItem>
         ))}

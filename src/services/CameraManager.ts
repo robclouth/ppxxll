@@ -12,17 +12,20 @@ class CameraManager {
   material: ShaderToyMaterial;
 
   isTakingPicture = false;
+  isRecording = false;
   photoProgress = 0;
   viewport!: Viewport;
 
-  imageCapture?: ImageCapture;
+  mode: "photo" | "video" = "photo";
   mediaStream?: MediaStream;
+  mediaRecorder?: MediaRecorder;
   cameraTexture?: THREE.VideoTexture;
-  latestPhotoUrl?: string;
   latestPhotoBlob?: Blob;
+  latestPhotoUrl?: string;
+  latestVideoBlob?: Blob;
+  latestVideoUrl?: string;
 
-  canvasWidth = 0;
-  canvasHeight = 0;
+  canvas?: HTMLCanvasElement;
 
   inputTextures: (THREE.Texture | undefined)[] = [
     undefined,
@@ -154,7 +157,7 @@ class CameraManager {
     if (this.material) this.material.dispose();
 
     this.material = new ShaderToyMaterial(shader);
-    this.material?.setSize(this.canvasWidth, this.canvasHeight);
+    this.material?.setSize(this.canvas!.width, this.canvas!.height);
     this.material.updateInputTextures(this.inputTextures);
   }
 
@@ -164,16 +167,44 @@ class CameraManager {
     });
   }
 
-  setCanvasSize(width: number, height: number) {
-    this.canvasWidth = width;
-    this.canvasHeight = height;
+  setPreviewCanvas(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
+  }
 
+  setPreviewCanvasSize(width: number, height: number) {
     if (!this.isTakingPicture) this.material?.setSize(width, height);
   }
 
   setInputTexture(index: number, texture?: THREE.Texture) {
     this.inputTextures[index] = texture;
     this.material.updateInputTextures(this.inputTextures);
+  }
+
+  startRecording() {
+    if (!this.canvas) return;
+
+    try {
+      const stream = this.canvas.captureStream(App.outputFps);
+      this.mediaRecorder = new MediaRecorder(stream);
+      this.mediaRecorder.addEventListener("dataavailable", (e) => {
+        const videoData = [e.data];
+        this.latestVideoBlob = new Blob(videoData, { type: "video/webm" });
+        this.latestVideoUrl = URL.createObjectURL(this.latestVideoBlob);
+      });
+
+      this.mediaRecorder.start();
+
+      this.isRecording = true;
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  stopRecording() {
+    if (this.mediaRecorder) {
+      this.mediaRecorder.stop();
+      this.isRecording = false;
+    }
   }
 
   async takePicture() {
@@ -210,7 +241,7 @@ class CameraManager {
     await this.startVideoCapture(true);
 
     this.material.shouldUpdateUniforms = true;
-    this.material.setSize(this.canvasWidth, this.canvasHeight);
+    this.material.setSize(this.canvas!.width, this.canvas!.height);
     this.material.updateInputTextures(this.inputTextures);
 
     this.isTakingPicture = false;
@@ -348,6 +379,25 @@ class CameraManager {
     } else throw "Share not available";
   }
 
+  shareLatestVideo() {
+    if (!this.latestVideoBlob) return;
+
+    const filename = `${new Date().getTime()}.webm`;
+    const files = [
+      new File([this.latestVideoBlob], filename, {
+        type: "video/webm",
+        lastModified: new Date().getTime(),
+      }),
+    ];
+
+    if (navigator.canShare && navigator.canShare({ files })) {
+      const shareData = {
+        files,
+      };
+      navigator.share(shareData);
+    } else throw "Share not available";
+  }
+
   downloadLatestPhoto() {
     if (!this.latestPhotoUrl) return;
 
@@ -357,6 +407,21 @@ class CameraManager {
     document.body.appendChild(a);
     a.style = "display: none";
     a.href = this.latestPhotoUrl;
+    a.download = filename;
+    a.click();
+
+    document.body.removeChild(a);
+  }
+
+  downloadLatestVideo() {
+    if (!this.latestVideoUrl) return;
+
+    const filename = `${new Date().getTime()}.webm`;
+
+    const a = document.createElement<any>("a");
+    document.body.appendChild(a);
+    a.style = "display: none";
+    a.href = this.latestVideoUrl;
     a.download = filename;
     a.click();
 

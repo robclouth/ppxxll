@@ -74,6 +74,14 @@ function ShaderList({ open, onClose }: Props) {
     ShaderManager.deleteShader(id);
   }
 
+  function handleGoToShaderToy(id: string) {
+    window.open(
+      `https://www.shadertoy.com/view/${id}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
   return (
     <Dialog
       container={document.getElementById("cameraView")}
@@ -110,13 +118,13 @@ function ShaderList({ open, onClose }: Props) {
         {Object.values(ShaderManager.shaders).map((shader) => (
           <ListItem
             key={shader.id}
-            disableGutters
             disablePadding
             secondaryAction={
               <ItemMenu
-                options={["Delete"]}
+                options={["Delete", "View in ShaderToy"]}
                 onSelect={(index) => {
                   if (index === 0) handleShaderDelete(shader.id);
+                  else if (index === 1) handleGoToShaderToy(shader.id);
                 }}
               />
             }
@@ -129,8 +137,8 @@ function ShaderList({ open, onClose }: Props) {
             <ListItemButton onClick={() => handleSelectShader(shader)}>
               <ListItemText
                 inset={ShaderManager.activeShader !== shader}
-                primary={shader.name}
-                secondary={shader.description}
+                primary={shader.title}
+                secondary={shader.author}
               />
             </ListItemButton>
           </ListItem>
