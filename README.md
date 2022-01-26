@@ -1,46 +1,33 @@
-# Getting Started with Create React App
+# ppxxll
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Check it out [here](www.ppxxll.vercel.app).
 
-## Available Scripts
+**ppxxll** is an open-source photo effects app built using web-technologies. Results are renderered at full photo resolution using a tile-based rendering system from [dekapng](https://github.com/greggman/dekapng).
 
-In the project directory, you can run:
+The app is a PWA, so you can download it to desktop and run it offline.
 
-### `yarn start`
+Only tested on Chrome for Android.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### Instructions
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+- Select an effect with the top-left menu
+- Take a picture using the shutter button
+- Preview the result then either share or download
 
-### `yarn test`
+### Effects
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+The effects are taken from [ShaderToy](www.shadertoy.com). To add a new shader, open the top-left menu in the camera screen to open the shader selection menu, then press the **+** button and enter a ShaderToy shader URL (e.g. https://www.shadertoy.com/view/fdscD2). For now, only single pass shaders are supported.
 
-### `yarn build`
+### Inputs
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+When a shader has inputs, you can use the **+** buttons on the left side of the camera screen to open the input select screen. Inputs can be either the camera input or images. To add an image press the **+** button in the top-right of the input select screen.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Parameters
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Effects can have parameters, but the variables you wish to be editable must be annotated with a specific comment on the same line, as follows:
 
-### `yarn eject`
+```
+const float brightness = 1.0; // @param min -10, max 10
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+Only globally defined const floats are supported for now. You must include the min and max values.
