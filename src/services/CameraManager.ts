@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { Size, Viewport } from "@react-three/fiber";
+import { Viewport } from "@react-three/fiber";
 import { makeAutoObservable } from "mobx";
-import ShaderToyMaterial from "../components/renderer/ShaderToyMaterial";
+import ShadertoyMaterial from "../components/renderer/ShadertoyMaterial";
 import { Shader } from "./ShaderManager";
 import App from "./App";
 
@@ -9,7 +9,7 @@ const chunkWidth = 500;
 const chunkHeight = 500;
 
 class CameraManager {
-  material: ShaderToyMaterial;
+  material: ShadertoyMaterial;
 
   isTakingPicture = false;
   isRecording = false;
@@ -40,7 +40,7 @@ class CameraManager {
 
   constructor() {
     makeAutoObservable(this);
-    this.material = new ShaderToyMaterial();
+    this.material = new ShadertoyMaterial();
   }
 
   async init() {
@@ -156,7 +156,7 @@ class CameraManager {
   setShader(shader: Shader) {
     if (this.material) this.material.dispose();
 
-    this.material = new ShaderToyMaterial(shader);
+    this.material = new ShadertoyMaterial(shader);
     this.material?.setSize(this.canvas!.width, this.canvas!.height);
     this.material.updateInputTextures(this.inputTextures);
   }

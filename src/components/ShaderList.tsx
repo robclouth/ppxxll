@@ -36,7 +36,7 @@ interface Props {
 
 function ShaderList({ open, onClose }: Props) {
   const [addTextureOpen, setAddTextureOpen] = useState(false);
-  const [shaderToyId, setShaderToyId] = useState<string | null>(null);
+  const [shadertoyUrl, setShadertoyUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   function handleClose() {
@@ -56,14 +56,22 @@ function ShaderList({ open, onClose }: Props) {
     setAddTextureOpen(false);
   }
 
-  async function handleShaderToyIdInputBlur(url: string) {
-    setShaderToyId(url);
+  async function handleUrlInputBlur(url: string) {
+    setShadertoyUrl(url);
   }
 
   async function handleAddPress() {
     try {
       setError("");
-      await ShaderManager.addShaderToyShader(shaderToyId!);
+      const match = shadertoyUrl?.match(
+        /^https:\/\/www\.shadertoy\.com\/view\/(\w+)/
+      );
+      if (!match) {
+        setError("Invalid Shadertoy URL");
+        return;
+      }
+
+      await ShaderManager.addShadertoyShader(shadertoyUrl!);
       handleAddShaderClose();
     } catch (err) {
       setError("Unable to get shader");
@@ -74,7 +82,7 @@ function ShaderList({ open, onClose }: Props) {
     ShaderManager.deleteShader(id);
   }
 
-  function handleGoToShaderToy(id: string) {
+  function handleGoToShadertoy(id: string) {
     window.open(
       `https://www.shadertoy.com/view/${id}`,
       "_blank",
@@ -121,10 +129,10 @@ function ShaderList({ open, onClose }: Props) {
             disablePadding
             secondaryAction={
               <ItemMenu
-                options={["Delete", "View in ShaderToy"]}
+                options={["Delete", "View in Shadertoy"]}
                 onSelect={(index) => {
                   if (index === 0) handleShaderDelete(shader.id);
-                  else if (index === 1) handleGoToShaderToy(shader.id);
+                  else if (index === 1) handleGoToShadertoy(shader.id);
                 }}
               />
             }
@@ -152,16 +160,16 @@ function ShaderList({ open, onClose }: Props) {
             id="name"
             fullWidth
             variant="standard"
-            placeholder="ShaderToy ID"
+            placeholder="Shadertoy URL"
             sx={{ mb: 1 }}
-            onChange={(e) => handleShaderToyIdInputBlur(e.target.value)}
+            onChange={(e) => handleUrlInputBlur(e.target.value)}
             error={!!error}
             helperText={error}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleAddShaderClose}>Cancel</Button>
-          <Button onClick={handleAddPress} disabled={!shaderToyId}>
+          <Button onClick={handleAddPress} disabled={!shadertoyUrl}>
             Add
           </Button>
         </DialogActions>

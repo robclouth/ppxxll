@@ -62,7 +62,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 }
 `;
 
-export default class ShaderToyMaterial extends THREE.ShaderMaterial {
+export default class ShadertoyMaterial extends THREE.ShaderMaterial {
   clock = new THREE.Clock();
 
   uniforms = {

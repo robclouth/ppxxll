@@ -64,15 +64,15 @@ class ShaderManager {
 
     if (Object.keys(this.shaders).length === 0) {
       await Promise.all([
-        this.addShaderToyShader("NsfcWf"),
-        this.addShaderToyShader("fdscD2"),
-        this.addShaderToyShader("Ns2cz1"),
-        this.addShaderToyShader("tlyBDG"),
+        this.addShadertoyShader("NsfcWf"),
+        this.addShadertoyShader("fdscD2"),
+        this.addShadertoyShader("Ns2cz1"),
+        this.addShadertoyShader("tlyBDG"),
       ]);
     }
   }
 
-  async addShaderToyShader(id: string) {
+  async addShadertoyShader(id: string) {
     try {
       const json = await (
         await fetch(`https://www.shadertoy.com/api/v1/shaders/${id}?key=fd8K4m`)

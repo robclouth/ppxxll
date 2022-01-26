@@ -18,7 +18,7 @@ Only tested on chrome for android and desktop.
 
 ### Effects
 
-The effects are taken from [ShaderToy](www.shadertoy.com). To add a new shader, open the top-left menu in the camera view to open the shader selection menu, then press the **+** button and enter a ShaderToy shader URL (e.g. https://www.shadertoy.com/view/fdscD2). For now, only single pass shaders are supported.
+The effects are taken from [Shadertoy](www.shadertoy.com). To add a new shader, open the top-left menu in the camera view to open the shader selection menu, then press the **+** button and enter a Shadertoy shader URL (e.g. https://www.shadertoy.com/view/fdscD2). For now, only single pass shaders are supported.
 
 ### Inputs
 
