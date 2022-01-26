@@ -71,6 +71,7 @@ class CameraManager {
               backDeviceId = device.deviceId;
             else if (device.label.toLowerCase().indexOf("front") >= 0)
               frontDeviceId = device.deviceId;
+            else frontDeviceId = backDeviceId = device.deviceId;
           }
         }
       });
