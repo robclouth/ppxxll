@@ -1,8 +1,8 @@
 # ppxxll
 
-**ppxxll** is an open-source photo effects app built using web-technologies. Results are renderered at full photo resolution using a tile-based rendering system from [dekapng](https://github.com/greggman/dekapng).
+**ppxxll** is an open-source photo effects app built using web-technologies. Results are rendered at full photo resolution using a tile-based rendering system from [dekapng](https://github.com/greggman/dekapng).
 
-Check it out [here](www.ppxxll.vercel.app).
+Check it out [here](https://ppxxll.vercel.app).
 
 The app is a PWA, so you can download it to desktop and run it offline.
 
