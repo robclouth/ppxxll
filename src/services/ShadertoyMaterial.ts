@@ -6,7 +6,7 @@ import {
   Vector3,
   Vector4,
 } from "three";
-import { Shader } from "../../types";
+import { Shader } from "../types";
 
 const VERTEX_SHADER = `
 varying vec2 vUv;

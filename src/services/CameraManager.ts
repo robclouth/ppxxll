@@ -13,7 +13,7 @@ import {
   VideoTexture,
   WebGLRenderer,
 } from "three";
-import ShadertoyMaterial from "../components/renderer/ShadertoyMaterial";
+import ShadertoyMaterial from "./ShadertoyMaterial";
 import { InputOutput, Shader } from "../types";
 import App from "./App";
 import ShaderManager from "./ShaderManager";
