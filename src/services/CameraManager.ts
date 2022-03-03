@@ -36,10 +36,12 @@ class CameraManager {
   inputTextures: (Texture | undefined)[] = [];
 
   latestPhotoCapture?: HTMLCanvasElement;
+
   latestPreviewUrl?: string;
 
+  latestExportBlob?: Blob;
+
   latestVideoBlob?: Blob;
-  latestVideoUrl?: string;
 
   canvas?: HTMLCanvasElement;
 
@@ -47,7 +49,7 @@ class CameraManager {
   frontCameraDeviceId?: string;
   backCameraDeviceId?: string;
 
-  invalidate: any;
+  isRenderingActive = true;
 
   constructor() {
     makeAutoObservable(this);
@@ -170,24 +172,9 @@ class CameraManager {
         });
       });
 
-      // const previousCameraTexture = this.cameraTexture;
       this.cameraTexture = new VideoTexture(video);
-
-      // if (previousCameraTexture)
-      //   this.inputTextures = this.inputTextures.map((texture) =>
-      //     texture === previousCameraTexture ? this.cameraTexture : texture
-      //   );
-
-      // if (this.material) this.material.updateInputTextures(this.inputTextures);
     } catch (error) {
       console.error(`Unable to start camera: ${error}`);
-    }
-  }
-
-  setPreviewActive(active: boolean) {
-    if (this.cameraTexture?.image) {
-      if (active) this.cameraTexture.image.play();
-      else this.cameraTexture.image.pause();
     }
   }
 
@@ -204,18 +191,8 @@ class CameraManager {
     this.material.updateInputTextures(this.inputTextures);
   }
 
-  wait(ms = 0) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
-  }
-
   setPreviewCanvas(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-  }
-
-  setInvalidateFunction(invalidate: any) {
-    this.invalidate = invalidate;
   }
 
   setPreviewCanvasSize(width: number, height: number) {
@@ -227,6 +204,19 @@ class CameraManager {
     this.material.updateInputTextures(this.inputTextures);
   }
 
+  setRenderingActive(active: boolean) {
+    this.isRenderingActive = active;
+
+    if (this.cameraTexture?.image) {
+      if (active) this.cameraTexture.image.play();
+      else this.cameraTexture.image.pause();
+    }
+
+    if (this.material) {
+      this.material.shouldUpdateUniforms = active;
+    }
+  }
+
   startRecording() {
     if (!this.canvas) return;
 
@@ -236,7 +226,6 @@ class CameraManager {
       this.mediaRecorder.addEventListener("dataavailable", (e) => {
         const videoData = [e.data];
         this.latestVideoBlob = new Blob(videoData, { type: "video/webm" });
-        this.latestVideoUrl = URL.createObjectURL(this.latestVideoBlob);
       });
 
       this.mediaRecorder.start();
@@ -317,7 +306,7 @@ class CameraManager {
     if (!this.material) return;
 
     this.shouldCapturePreview = true;
-    this.latestPhotoCapture = undefined;
+    this.latestExportBlob = undefined;
   }
 
   async finishPreviewCapture(dataUrl: string) {
@@ -325,11 +314,12 @@ class CameraManager {
     this.shouldCapturePreview = false;
 
     if (this.mediaStream) {
+      this.latestPhotoCapture = undefined;
       await this.capturePhoto();
       await this.startVideoCapture(true);
     }
 
-    await this.exportImage();
+    this.setRenderingActive(false);
   }
 
   async exportImage() {
@@ -341,8 +331,6 @@ class CameraManager {
     const exportSize = { ...App.exportSize };
 
     this.cameraTexture?.image.pause();
-
-    this.material.shouldUpdateUniforms = false;
 
     const shaderInputTextures = [...this.inputTextures];
 
@@ -434,56 +422,28 @@ class CameraManager {
     renderer.dispose();
 
     const imageBuffer = await finish();
-    const imageBlob = new Blob([imageBuffer]);
-    const imageUrl = URL.createObjectURL(imageBlob);
+    this.latestExportBlob = new Blob([imageBuffer]);
 
-    console.log("Finished");
-
-    const filename = `${new Date().getTime()}.png`;
-
-    const a = document.createElement<any>("a");
-    document.body.appendChild(a);
-    a.style = "display: none";
-    a.href = imageUrl;
-    a.download = filename;
-    a.click();
-
-    document.body.removeChild(a);
-
-    URL.revokeObjectURL(imageUrl);
-
-    await this.startVideoCapture(true);
-
-    this.material.shouldUpdateUniforms = true;
     this.material.setSize(this.canvas!.width, this.canvas!.height);
     this.material.updateInputTextures(this.inputTextures);
 
     this.isExporting = false;
   }
 
-  shareLatestPhoto() {
-    // if (!this.latestPhotoBlob) return;
-    // const filename = `${new Date().getTime()}.png`;
-    // const files = [
-    //   new File([this.latestPhotoBlob], filename, {
-    //     type: "image/png",
-    //     lastModified: new Date().getTime(),
-    //   }),
-    // ];
-    // if (navigator.canShare && navigator.canShare({ files })) {
-    //   const shareData = {
-    //     files,
-    //   };
-    //   navigator.share(shareData);
-    // } else throw "Share not available";
+  async shareExport() {
+    if (!this.latestExportBlob) await this.exportImage();
+
+    this.shareFile(this.latestExportBlob!, "png");
   }
 
-  shareLatestVideo() {
-    if (!this.latestVideoBlob) return;
+  shareVideo() {
+    if (this.latestVideoBlob) this.shareFile(this.latestVideoBlob, "webm");
+  }
 
-    const filename = `${new Date().getTime()}.webm`;
+  shareFile(blob: Blob, extension: string) {
+    const filename = `${new Date().getTime()}.${extension}`;
     const files = [
-      new File([this.latestVideoBlob], filename, {
+      new File([blob], filename, {
         type: "video/webm",
         lastModified: new Date().getTime(),
       }),
@@ -497,30 +457,29 @@ class CameraManager {
     } else throw "Share not available";
   }
 
-  downloadLatestPhoto() {
-    if (!this.latestPreviewUrl) return;
+  async downloadExport() {
+    if (!this.latestExportBlob) await this.exportImage();
 
-    const filename = `${new Date().getTime()}.png`;
-
-    const a = document.createElement<any>("a");
-    document.body.appendChild(a);
-    a.style = "display: none";
-    a.href = this.latestPreviewUrl;
-    a.download = filename;
-    a.click();
-
-    document.body.removeChild(a);
+    const url = URL.createObjectURL(this.latestExportBlob!);
+    this.downloadFile(url, "png");
+    URL.revokeObjectURL(url);
   }
 
-  downloadLatestVideo() {
-    if (!this.latestVideoUrl) return;
+  downloadVideo() {
+    if (!this.latestVideoBlob) return;
 
-    const filename = `${new Date().getTime()}.webm`;
+    const url = URL.createObjectURL(this.latestVideoBlob);
+    this.downloadFile(url, "webm");
+    URL.revokeObjectURL(url);
+  }
+
+  downloadFile(url: string, extension: string) {
+    const filename = `${new Date().getTime()}.${extension}`;
 
     const a = document.createElement<any>("a");
     document.body.appendChild(a);
     a.style = "display: none";
-    a.href = this.latestVideoUrl;
+    a.href = url;
     a.download = filename;
     a.click();
 

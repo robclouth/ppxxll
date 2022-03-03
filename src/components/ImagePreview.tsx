@@ -17,8 +17,8 @@ interface Props {
   onClose: () => void;
 }
 
-function PhotoPreview({ open, onClose }: Props) {
-  const { latestPreviewUrl: latestPhotoUrl } = CameraManager;
+function ImagePreview({ open, onClose }: Props) {
+  const { latestPreviewUrl } = CameraManager;
   const imgRef = useRef<any>();
 
   const onUpdate = useCallback(({ x, y, scale }) => {
@@ -35,12 +35,16 @@ function PhotoPreview({ open, onClose }: Props) {
     onClose();
   }
 
-  function handleSharePress() {
-    CameraManager.shareLatestPhoto();
+  async function handleSharePress() {
+    try {
+      await CameraManager.shareExport();
+    } catch (err) {
+      console.log(err);
+    }
   }
 
-  function handleDownloadPress() {
-    CameraManager.downloadLatestPhoto();
+  async function handleDownloadPress() {
+    await CameraManager.downloadExport();
   }
 
   return (
@@ -51,9 +55,9 @@ function PhotoPreview({ open, onClose }: Props) {
       onClose={handleClose}
       TransitionComponent={Transition as any}
     >
-      {latestPhotoUrl && (
+      {latestPreviewUrl && (
         <QuickPinchZoom onUpdate={onUpdate}>
-          <img ref={imgRef} src={latestPhotoUrl} />
+          <img ref={imgRef} src={latestPreviewUrl} />
         </QuickPinchZoom>
       )}
       <IconButton
@@ -87,4 +91,4 @@ function PhotoPreview({ open, onClose }: Props) {
   );
 }
 
-export default observer(PhotoPreview);
+export default observer(ImagePreview);

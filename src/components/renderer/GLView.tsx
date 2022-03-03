@@ -9,7 +9,7 @@ import CameraManager from "../../services/CameraManager";
 
 const ShaderQuad = observer(() => {
   const { material } = CameraManager;
-  const { gl, size, invalidate } = useThree();
+  const { gl, size } = useThree();
 
   useEffect(() => {
     CameraManager.setPreviewCanvas(gl.domElement);
@@ -20,7 +20,7 @@ const ShaderQuad = observer(() => {
   }, [size.width, size.height]);
 
   useFrame(({ gl, scene, camera }) => {
-    gl.render(scene, camera);
+    if (CameraManager.isRenderingActive) gl.render(scene, camera);
 
     if (CameraManager.shouldCapturePreview) {
       CameraManager.finishPreviewCapture(gl.domElement.toDataURL());

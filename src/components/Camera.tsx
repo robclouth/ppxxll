@@ -20,7 +20,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import Parameters from "./Parameters";
 import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
 import { observer } from "mobx-react";
-import PhotoPreview from "./PhotoPreview";
+import ImagePreview from "./ImagePreview";
 import VideoPreview from "./VideoPreview";
 
 const buttonStyle = {
@@ -60,7 +60,6 @@ function Camera() {
   const handle = useFullScreenHandle();
 
   const { activeShader } = ShaderManager;
-  const { latestPreviewUrl: latestPhotoUrl, latestVideoUrl } = CameraManager;
 
   const [shaderListOpen, setShaderListOpen] = useState(false);
   const [parametersOpen, setParametersOpen] = useState(false);
@@ -69,10 +68,12 @@ function Camera() {
 
   function handleShaderListClose() {
     setShaderListOpen(false);
+    CameraManager.setRenderingActive(true);
   }
 
   function handleShaderListPress() {
     setShaderListOpen(true);
+    CameraManager.setRenderingActive(false);
   }
 
   function handleParametersClose() {
@@ -85,10 +86,12 @@ function Camera() {
 
   function handlePhotoPreviewClose() {
     setPhotoPreviewOpen(false);
+    CameraManager.setRenderingActive(true);
   }
 
   function handleVideoPreviewClose() {
     setVideoPreviewOpen(false);
+    CameraManager.setRenderingActive(true);
   }
 
   async function handleTakePicturePress() {
@@ -227,7 +230,7 @@ function Camera() {
         </Button>
         <ShaderList open={shaderListOpen} onClose={handleShaderListClose} />
         <Parameters open={parametersOpen} onClose={handleParametersClose} />
-        <PhotoPreview
+        <ImagePreview
           open={photoPreviewOpen}
           onClose={handlePhotoPreviewClose}
         />

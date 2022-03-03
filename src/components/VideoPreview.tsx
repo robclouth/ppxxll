@@ -4,7 +4,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 
 import { Dialog, IconButton, Slide } from "@mui/material";
 import { observer } from "mobx-react";
-import { forwardRef, useCallback, useRef } from "react";
+import { forwardRef, useCallback, useMemo, useRef } from "react";
 import CameraManager from "../services/CameraManager";
 
 const Transition = forwardRef<any>(function Transition(props: any, ref: any) {
@@ -17,19 +17,23 @@ interface Props {
 }
 
 function VideoPreview({ open, onClose }: Props) {
-  const { latestVideoUrl } = CameraManager;
+  const { latestVideoBlob } = CameraManager;
   const imgRef = useRef<any>();
+
+  const videoUrl = useMemo(() => {
+    return latestVideoBlob ? URL.createObjectURL(latestVideoBlob) : undefined;
+  }, [latestVideoBlob]);
 
   function handleClose() {
     onClose();
   }
 
   function handleSharePress() {
-    CameraManager.shareLatestVideo();
+    CameraManager.shareVideo();
   }
 
   function handleDownloadPress() {
-    CameraManager.downloadLatestVideo();
+    CameraManager.downloadVideo();
   }
 
   return (
@@ -40,8 +44,8 @@ function VideoPreview({ open, onClose }: Props) {
       onClose={handleClose}
       TransitionComponent={Transition as any}
     >
-      {latestVideoUrl && (
-        <video ref={imgRef} src={latestVideoUrl} controls loop autoPlay muted />
+      {videoUrl && (
+        <video ref={imgRef} src={videoUrl} controls loop autoPlay muted />
       )}
       <IconButton
         edge="start"
