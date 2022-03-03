@@ -6,7 +6,7 @@ import Typography from "@mui/material/Typography";
 import Slider from "@mui/material/Slider";
 import Input from "@mui/material/Input";
 import { observer } from "mobx-react";
-import { Parameter } from "../services/ShaderManager";
+import { Parameter } from "../types";
 import startCase from "lodash/startCase";
 import { useState } from "react";
 

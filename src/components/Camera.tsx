@@ -3,7 +3,7 @@ import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import {
-  Backdrop,
+  Modal,
   Box,
   Button,
   CircularProgress,
@@ -42,13 +42,17 @@ const Progress = observer(() => {
   const { photoProgress } = CameraManager;
 
   return (
-    <Backdrop open={CameraManager.isTakingPicture}>
+    <Modal
+      open={CameraManager.isExporting}
+      container={document.getElementById("cameraView")}
+      sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}
+    >
       <CircularProgress
         color="inherit"
         variant="determinate"
         value={Math.min(photoProgress * 100, 100)}
       />
-    </Backdrop>
+    </Modal>
   );
 });
 
@@ -56,26 +60,12 @@ function Camera() {
   const handle = useFullScreenHandle();
 
   const { activeShader } = ShaderManager;
-  const { latestPhotoUrl, latestVideoUrl } = CameraManager;
+  const { latestPreviewUrl: latestPhotoUrl, latestVideoUrl } = CameraManager;
 
   const [shaderListOpen, setShaderListOpen] = useState(false);
   const [parametersOpen, setParametersOpen] = useState(false);
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
   const [videoPreviewOpen, setVideoPreviewOpen] = useState(false);
-
-  useEffect(() => {
-    latestPhotoUrl && setPhotoPreviewOpen(true);
-  }, [latestPhotoUrl]);
-
-  useEffect(() => {
-    latestVideoUrl && setVideoPreviewOpen(true);
-  }, [latestVideoUrl]);
-
-  useEffect(() => {
-    CameraManager.setPreviewActive(
-      !(shaderListOpen || photoPreviewOpen || videoPreviewOpen)
-    );
-  }, [shaderListOpen, photoPreviewOpen, videoPreviewOpen]);
 
   function handleShaderListClose() {
     setShaderListOpen(false);
@@ -102,8 +92,10 @@ function Camera() {
   }
 
   async function handleTakePicturePress() {
-    if (CameraManager.mode === "photo") await CameraManager.takePicture();
-    else {
+    if (CameraManager.mode === "photo") {
+      await CameraManager.startPreviewCapture();
+      setPhotoPreviewOpen(true);
+    } else {
       if (!CameraManager.isRecording) CameraManager.startRecording();
       else CameraManager.stopRecording();
     }

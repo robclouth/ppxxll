@@ -18,7 +18,7 @@ interface Props {
 }
 
 function PhotoPreview({ open, onClose }: Props) {
-  const { latestPhotoUrl } = CameraManager;
+  const { latestPreviewUrl: latestPhotoUrl } = CameraManager;
   const imgRef = useRef<any>();
 
   const onUpdate = useCallback(({ x, y, scale }) => {

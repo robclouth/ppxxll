@@ -1,23 +1,10 @@
 import AddIcon from "@mui/icons-material/Add";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import {
-  AppBar,
-  Box,
-  Button,
-  ButtonBase,
-  Dialog,
-  IconButton,
-  ImageList,
-  ImageListItem,
-  Slide,
-  Toolbar,
-  Typography,
-} from "@mui/material";
+import { Box, Button } from "@mui/material";
 import { observer } from "mobx-react";
-import { forwardRef, useEffect, useRef, useState } from "react";
-import * as THREE from "three";
+import { useEffect, useRef, useState } from "react";
 import { InputType } from "zlib";
 import CameraManager from "../services/CameraManager";
+import ShaderManager from "../services/ShaderManager";
 import TextureList from "./TextureList";
 
 type Props = {
@@ -48,15 +35,15 @@ function ImageInputButton({ index }: Props) {
   }
 
   async function handleTextureSelect(url: string | null, type: InputType) {
+    const input = ShaderManager.activeShader?.passes[0].inputs[index]!;
+
     if (url) {
-      new THREE.TextureLoader()
-        .setCrossOrigin("anonymous")
-        .load(url, (texture) => {
-          CameraManager.setInputTexture(index, texture);
-        });
+      input.url = url;
     } else if (type === "camera") {
-      CameraManager.setInputTexture(index, CameraManager.cameraTexture);
+      input.url = undefined;
+      input.type = "camera";
     }
+
     handleClose();
   }
 

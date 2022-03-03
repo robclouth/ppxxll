@@ -1,7 +1,13 @@
-import { makeAutoObservable } from "mobx";
+import { configure, makeAutoObservable } from "mobx";
 import CameraManager from "./CameraManager";
 import ShaderManager from "./ShaderManager";
 import TextureManager from "./TextureManager";
+import { Cache } from "three";
+
+Cache.enabled = true;
+configure({
+  enforceActions: "never",
+});
 
 class App {
   isPointerDown = false;
@@ -14,9 +20,9 @@ class App {
     y: 0,
   };
 
-  outputSize = {
-    width: 1000,
-    height: 1000,
+  exportSize = {
+    width: 4000,
+    height: 4000,
   };
 
   outputFps = 30;
@@ -26,11 +32,8 @@ class App {
   }
 
   async init() {
-    await Promise.all([
-      ShaderManager.init(),
-      CameraManager.init(),
-      TextureManager.init(),
-    ]);
+    await Promise.all([ShaderManager.init(), TextureManager.init()]);
+    await CameraManager.init();
   }
 
   setPointerDown(x: number, y: number) {

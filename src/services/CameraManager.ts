@@ -1,53 +1,89 @@
-import * as THREE from "three";
 import { Viewport } from "@react-three/fiber";
-import { makeAutoObservable } from "mobx";
+import { autorun, makeAutoObservable } from "mobx";
+import { spawn, Transfer, Worker } from "threads";
+import {
+  CanvasTexture,
+  Material,
+  Mesh,
+  OrthographicCamera,
+  PlaneBufferGeometry,
+  Scene,
+  Texture,
+  TextureLoader,
+  VideoTexture,
+  WebGLRenderer,
+} from "three";
 import ShadertoyMaterial from "../components/renderer/ShadertoyMaterial";
-import { Shader } from "./ShaderManager";
+import { InputOutput, Shader } from "../types";
 import App from "./App";
+import ShaderManager from "./ShaderManager";
 
-const chunkWidth = 500;
-const chunkHeight = 500;
+const maxChunkSize = 500;
 
 class CameraManager {
   material: ShadertoyMaterial;
 
-  isTakingPicture = false;
+  shouldCapturePreview = false;
   isRecording = false;
+  isExporting = false;
   photoProgress = 0;
   viewport!: Viewport;
 
   mode: "photo" | "video" = "photo";
   mediaStream?: MediaStream;
   mediaRecorder?: MediaRecorder;
-  cameraTexture?: THREE.VideoTexture;
-  latestPhotoBlob?: Blob;
-  latestPhotoUrl?: string;
+  cameraTexture?: VideoTexture;
+  inputTextures: (Texture | undefined)[] = [];
+
+  latestPhotoCapture?: HTMLCanvasElement;
+  latestPreviewUrl?: string;
+
   latestVideoBlob?: Blob;
   latestVideoUrl?: string;
 
   canvas?: HTMLCanvasElement;
 
-  inputTextures: (THREE.Texture | undefined)[] = [
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-  ];
-
   activeCamera: "front" | "back" = "back";
   frontCameraDeviceId?: string;
   backCameraDeviceId?: string;
+
+  invalidate: any;
 
   constructor() {
     makeAutoObservable(this);
     this.material = new ShadertoyMaterial();
   }
 
+  get inputs(): InputOutput[] {
+    const activeShader = ShaderManager.activeShader;
+
+    if (activeShader) return activeShader.passes[0].inputs;
+    else return [{ type: "camera" }];
+  }
+
   async init() {
     await this.detectCameras();
     await this.startVideoCapture();
 
-    if (this.cameraTexture) this.setInputTexture(0, this.cameraTexture);
+    autorun(async () => {
+      this.inputTextures = await Promise.all(
+        this.inputs.map(({ type, url }) => {
+          if (url) {
+            return new Promise<Texture>((resolve, reject) => {
+              new TextureLoader()
+                .setCrossOrigin("anonymous")
+                .load(url, (texture) => {
+                  resolve(texture);
+                });
+            });
+          } else if (type === "camera") {
+            return Promise.resolve<Texture>(this.cameraTexture as Texture);
+          }
+        })
+      );
+    });
+
+    if (ShaderManager.activeShader) this.setShader(ShaderManager.activeShader);
   }
 
   async detectCameras() {
@@ -118,25 +154,31 @@ class CameraManager {
 
       console.log(`Stream res: ${width}:${height}`);
 
-      const videoElement = document.createElement("video");
-      videoElement.srcObject = this.mediaStream;
-      videoElement.muted = true;
-      videoElement.controls = false;
-      videoElement.autoplay = true;
-      videoElement.playsInline = true;
-      videoElement.width = width!;
-      videoElement.height = height!;
-      await videoElement.play();
+      const video = document.createElement("video");
+      video.srcObject = this.mediaStream;
+      video.width = width!;
+      video.height = height!;
 
-      const previousCameraTexture = this.cameraTexture;
-      this.cameraTexture = new THREE.VideoTexture(videoElement);
+      await new Promise<void>((resolve, reject) => {
+        video.addEventListener("loadeddata", async () => {
+          try {
+            await video.play();
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
 
-      if (previousCameraTexture)
-        this.inputTextures = this.inputTextures.map((texture) =>
-          texture === previousCameraTexture ? this.cameraTexture : texture
-        );
+      // const previousCameraTexture = this.cameraTexture;
+      this.cameraTexture = new VideoTexture(video);
 
-      if (this.material) this.material.updateInputTextures(this.inputTextures);
+      // if (previousCameraTexture)
+      //   this.inputTextures = this.inputTextures.map((texture) =>
+      //     texture === previousCameraTexture ? this.cameraTexture : texture
+      //   );
+
+      // if (this.material) this.material.updateInputTextures(this.inputTextures);
     } catch (error) {
       console.error(`Unable to start camera: ${error}`);
     }
@@ -172,11 +214,15 @@ class CameraManager {
     this.canvas = canvas;
   }
 
-  setPreviewCanvasSize(width: number, height: number) {
-    if (!this.isTakingPicture) this.material?.setSize(width, height);
+  setInvalidateFunction(invalidate: any) {
+    this.invalidate = invalidate;
   }
 
-  setInputTexture(index: number, texture?: THREE.Texture) {
+  setPreviewCanvasSize(width: number, height: number) {
+    if (!this.isExporting) this.material?.setSize(width, height);
+  }
+
+  setInputTexture(index: number, texture?: Texture) {
     this.inputTextures[index] = texture;
     this.material.updateInputTextures(this.inputTextures);
   }
@@ -208,36 +254,203 @@ class CameraManager {
     }
   }
 
-  async takePicture() {
+  async capturePhoto() {
+    try {
+      if (this.mediaStream) {
+        this.mediaStream.getTracks().forEach((track) => {
+          track.stop();
+        });
+      }
+
+      const constraints = {
+        audio: false,
+        video: {
+          width: { ideal: 8000 },
+          height: { ideal: 8000 * 0.75 },
+          deviceId: {
+            exact:
+              this.activeCamera === "front"
+                ? this.frontCameraDeviceId
+                : this.backCameraDeviceId,
+          },
+        },
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      const mediaStreamTrack = stream.getVideoTracks()[0];
+      let { width, height } = mediaStreamTrack.getSettings();
+
+      console.log(`Take photo res: ${width}:${height}`);
+
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.width = width!;
+      video.height = height!;
+
+      this.latestPhotoCapture = document.createElement("canvas");
+      const context = this.latestPhotoCapture.getContext("2d")!;
+
+      video.srcObject = stream;
+
+      await new Promise<void>((resolve, reject) => {
+        video.addEventListener("loadeddata", async () => {
+          const { videoWidth, videoHeight } = video;
+          this.latestPhotoCapture!.width = videoWidth;
+          this.latestPhotoCapture!.height = videoHeight;
+
+          try {
+            await video.play();
+            context.drawImage(video, 0, 0, videoWidth, videoHeight);
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+    } catch (error) {
+      console.error(`Unable to take photo: ${error}`);
+    }
+  }
+
+  async startPreviewCapture() {
     if (!this.material) return;
 
-    const outputSize = App.outputSize;
+    this.shouldCapturePreview = true;
+    this.latestPhotoCapture = undefined;
+  }
 
-    this.isTakingPicture = true;
-    this.photoProgress = 0;
-
-    this.cameraTexture?.image.pause();
-    this.material.shouldUpdateUniforms = false;
+  async finishPreviewCapture(dataUrl: string) {
+    this.latestPreviewUrl = dataUrl;
+    this.shouldCapturePreview = false;
 
     if (this.mediaStream) {
-      await this.startVideoCapture(false);
-      await this.wait(500);
-      this.cameraTexture?.image.pause();
-
-      const mediaStreamTrack = this.mediaStream.getVideoTracks()[0];
-      let { width, height } = mediaStreamTrack.getSettings();
-      outputSize.width = width!;
-      outputSize.height = height!;
+      await this.capturePhoto();
+      await this.startVideoCapture(true);
     }
 
-    this.material.setSize(outputSize.width, outputSize.height);
-    const blob = await this.exportPng(
-      this.material,
-      outputSize.width,
-      outputSize.height
+    await this.exportImage();
+  }
+
+  async exportImage() {
+    if (!this.material) return;
+
+    this.isExporting = true;
+    this.photoProgress = 0;
+
+    const exportSize = { ...App.exportSize };
+
+    this.cameraTexture?.image.pause();
+
+    this.material.shouldUpdateUniforms = false;
+
+    const shaderInputTextures = [...this.inputTextures];
+
+    if (this.latestPhotoCapture) {
+      const texture = new CanvasTexture(this.latestPhotoCapture);
+
+      this.inputs.forEach(({ type }, i) => {
+        if (type === "camera") {
+          shaderInputTextures[i] = texture;
+        }
+      });
+    }
+
+    const { start, addRowChunks, finish } = await spawn(
+      new Worker("./ExportThread")
     );
-    this.latestPhotoBlob = blob;
-    this.latestPhotoUrl = URL.createObjectURL(blob);
+    await start(exportSize.width, exportSize.height);
+
+    this.material.setSize(exportSize.width, exportSize.height);
+    this.material.updateInputTextures(shaderInputTextures);
+
+    const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    camera.position.z = 1;
+    const scene = new Scene();
+    const quad = new Mesh(new PlaneBufferGeometry(2, 2, 1, 1), this.material);
+    scene.add(quad);
+
+    const renderer = new WebGLRenderer({ alpha: true });
+
+    const totalChunks =
+      Math.ceil(exportSize.width / maxChunkSize) *
+      Math.ceil(exportSize.height / maxChunkSize);
+    let numChunksProcessed = 0;
+
+    for (let chunkY = 0; chunkY < exportSize.height; chunkY += maxChunkSize) {
+      const chunkHeight = Math.min(maxChunkSize, exportSize.height - chunkY);
+
+      const rowChunks = [];
+      for (let chunkX = 0; chunkX < exportSize.width; chunkX += maxChunkSize) {
+        const chunkWidth = Math.min(maxChunkSize, exportSize.width - chunkX);
+        const chunkBuffer = new ArrayBuffer(chunkWidth * chunkHeight * 4);
+
+        renderer.setSize(chunkWidth, chunkHeight);
+
+        camera.setViewOffset(
+          exportSize.width,
+          exportSize.height,
+          chunkX,
+          chunkY,
+          chunkWidth,
+          chunkHeight
+        );
+        camera.updateProjectionMatrix();
+
+        renderer.render(scene, camera);
+
+        const gl = renderer.getContext();
+
+        const uintArray = new Uint8Array(chunkBuffer);
+
+        gl.readPixels(
+          0,
+          0,
+          chunkWidth,
+          chunkHeight,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          uintArray
+        );
+
+        rowChunks.push({ chunkBuffer, chunkWidth, chunkHeight });
+
+        numChunksProcessed++;
+
+        this.photoProgress = numChunksProcessed / totalChunks;
+        console.log(this.photoProgress);
+      }
+
+      await addRowChunks(
+        Transfer(
+          rowChunks.map((chunk) => chunk.chunkBuffer),
+          rowChunks.map((chunk) => chunk.chunkBuffer)
+        ),
+        rowChunks.map((chunk) => chunk.chunkWidth),
+        chunkHeight
+      );
+    }
+
+    renderer.dispose();
+
+    const imageBuffer = await finish();
+    const imageBlob = new Blob([imageBuffer]);
+    const imageUrl = URL.createObjectURL(imageBlob);
+
+    console.log("Finished");
+
+    const filename = `${new Date().getTime()}.png`;
+
+    const a = document.createElement<any>("a");
+    document.body.appendChild(a);
+    a.style = "display: none";
+    a.href = imageUrl;
+    a.download = filename;
+    a.click();
+
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(imageUrl);
 
     await this.startVideoCapture(true);
 
@@ -245,139 +458,24 @@ class CameraManager {
     this.material.setSize(this.canvas!.width, this.canvas!.height);
     this.material.updateInputTextures(this.inputTextures);
 
-    this.isTakingPicture = false;
-  }
-
-  async exportPng(material: THREE.Material, width: number, height: number) {
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    camera.position.z = 1;
-    const scene = new THREE.Scene();
-    const quad = new THREE.Mesh(
-      new THREE.PlaneBufferGeometry(2, 2, 1, 1),
-      material
-    );
-    scene.add(quad);
-
-    const renderer = new THREE.WebGLRenderer({ alpha: true });
-
-    const pngRGBAWriter = new (window as any).dekapng.PNGRGBAWriter(
-      width,
-      height
-    );
-
-    for (let chunkY = 0; chunkY < height; chunkY += chunkHeight) {
-      const rowChunks = [];
-      const localHeight = Math.min(chunkHeight, height - chunkY);
-
-      for (let chunkX = 0; chunkX < width; chunkX += chunkWidth) {
-        const localWidth = Math.min(chunkWidth, width - chunkX);
-
-        const data = this.drawArea(
-          renderer,
-          camera,
-          scene,
-          width,
-          height,
-          chunkX,
-          chunkY,
-          localWidth,
-          localHeight
-        );
-        rowChunks.push(data);
-      }
-
-      for (let row = 0; row < localHeight; ++row) {
-        rowChunks.forEach((chunk, ndx) => {
-          const rowSize = chunk.width * 4;
-          const chunkOffset = rowSize * row;
-          pngRGBAWriter.addPixels(chunk.data, chunkOffset, chunk.width);
-        });
-      }
-
-      this.photoProgress = (chunkY + chunkHeight) / height;
-      console.log(this.photoProgress);
-
-      await this.wait();
-    }
-
-    renderer.dispose();
-
-    return pngRGBAWriter.finishAndGetBlob();
-  }
-
-  drawArea(
-    renderer: THREE.WebGLRenderer,
-    camera: THREE.OrthographicCamera,
-    scene: THREE.Scene,
-    width: number,
-    height: number,
-    chunkX: number,
-    chunkY: number,
-    chunkWidth: number,
-    chunkHeight: number
-  ) {
-    renderer.setSize(chunkWidth, chunkHeight);
-
-    camera.setViewOffset(
-      width,
-      height,
-      chunkX,
-      chunkY,
-      chunkWidth,
-      chunkHeight
-    );
-    camera.updateProjectionMatrix();
-
-    renderer.render(scene, camera);
-
-    const data = new Uint8Array(chunkWidth * chunkHeight * 4);
-    const gl = renderer.getContext();
-
-    gl.readPixels(
-      0,
-      0,
-      chunkWidth,
-      chunkHeight,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      data
-    );
-
-    // swap lines (should probably just fix code in makeBigPng to read backward
-    const lineSize = chunkWidth * 4;
-    const line = new Uint8Array(lineSize);
-    const numLines = (chunkHeight / 2) | 0;
-    for (let i = 0; i < numLines; ++i) {
-      const topOffset = lineSize * i;
-      const bottomOffset = lineSize * (chunkHeight - i - 1);
-      line.set(data.slice(topOffset, topOffset + lineSize), 0);
-      data.set(data.slice(bottomOffset, bottomOffset + lineSize), topOffset);
-      data.set(line, bottomOffset);
-    }
-    return {
-      width: chunkWidth,
-      height: chunkHeight,
-      data: data,
-    };
+    this.isExporting = false;
   }
 
   shareLatestPhoto() {
-    if (!this.latestPhotoBlob) return;
-
-    const filename = `${new Date().getTime()}.png`;
-    const files = [
-      new File([this.latestPhotoBlob], filename, {
-        type: "image/png",
-        lastModified: new Date().getTime(),
-      }),
-    ];
-
-    if (navigator.canShare && navigator.canShare({ files })) {
-      const shareData = {
-        files,
-      };
-      navigator.share(shareData);
-    } else throw "Share not available";
+    // if (!this.latestPhotoBlob) return;
+    // const filename = `${new Date().getTime()}.png`;
+    // const files = [
+    //   new File([this.latestPhotoBlob], filename, {
+    //     type: "image/png",
+    //     lastModified: new Date().getTime(),
+    //   }),
+    // ];
+    // if (navigator.canShare && navigator.canShare({ files })) {
+    //   const shareData = {
+    //     files,
+    //   };
+    //   navigator.share(shareData);
+    // } else throw "Share not available";
   }
 
   shareLatestVideo() {
@@ -400,14 +498,14 @@ class CameraManager {
   }
 
   downloadLatestPhoto() {
-    if (!this.latestPhotoUrl) return;
+    if (!this.latestPreviewUrl) return;
 
     const filename = `${new Date().getTime()}.png`;
 
     const a = document.createElement<any>("a");
     document.body.appendChild(a);
     a.style = "display: none";
-    a.href = this.latestPhotoUrl;
+    a.href = this.latestPreviewUrl;
     a.download = filename;
     a.click();
 

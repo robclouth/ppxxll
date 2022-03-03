@@ -21,8 +21,8 @@ import {
 } from "@mui/material";
 import { observer } from "mobx-react";
 import { forwardRef, useState } from "react";
-import ShaderManager, { Shader } from "../services/ShaderManager";
-import TextureManager from "../services/TextureManager";
+import ShaderManager from "../services/ShaderManager";
+import { Shader } from "../types";
 import ItemMenu from "./ItemMenu";
 
 const Transition = forwardRef<any>(function Transition(props: any, ref: any) {

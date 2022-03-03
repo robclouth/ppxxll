@@ -1,5 +1,12 @@
-import * as THREE from "three";
-import { Shader } from "../../services/ShaderManager";
+import {
+  Clock,
+  ShaderMaterial,
+  Texture,
+  Vector2,
+  Vector3,
+  Vector4,
+} from "three";
+import { Shader } from "../../types";
 
 const VERTEX_SHADER = `
 varying vec2 vUv;
@@ -62,24 +69,19 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 }
 `;
 
-export default class ShadertoyMaterial extends THREE.ShaderMaterial {
-  clock = new THREE.Clock();
+export default class ShadertoyMaterial extends ShaderMaterial {
+  clock = new Clock();
 
   uniforms = {
-    iResolution: { value: new THREE.Vector2() },
+    iResolution: { value: new Vector2() },
     iTime: { value: 0 },
     iTimeDelta: { value: 0 },
     iFrame: { value: 0 },
-    iChannelTime: { value: new THREE.Vector4() },
+    iChannelTime: { value: new Vector4() },
     iChannelResolution: {
-      value: [
-        new THREE.Vector3(),
-        new THREE.Vector3(),
-        new THREE.Vector3(),
-        new THREE.Vector3(),
-      ],
+      value: [new Vector3(), new Vector3(), new Vector3(), new Vector3()],
     },
-    iMouse: { value: new THREE.Vector4() },
+    iMouse: { value: new Vector4() },
     iChannel0: {
       value: null,
     },
@@ -92,7 +94,7 @@ export default class ShadertoyMaterial extends THREE.ShaderMaterial {
     iChannel3: {
       value: null,
     },
-    iDate: { value: new THREE.Vector4() },
+    iDate: { value: new Vector4() },
     iSampleRate: { value: 0 },
   };
 
@@ -132,7 +134,7 @@ export default class ShadertoyMaterial extends THREE.ShaderMaterial {
       const date = new Date();
       const seconds =
         date.getSeconds() + 60 * date.getMinutes() + 60 * 60 * date.getHours();
-      this.uniforms.iDate.value = new THREE.Vector4(
+      this.uniforms.iDate.value = new Vector4(
         date.getFullYear(),
         date.getMonth(),
         date.getDay(),
@@ -169,22 +171,20 @@ export default class ShadertoyMaterial extends THREE.ShaderMaterial {
     );
   }
 
-  updateInputTextures(textures: (THREE.Texture | undefined)[]) {
-    for (let i = 0; i < 4; i++) {
+  updateInputTextures(textures: (Texture | undefined)[]) {
+    textures.forEach((texture, i) => {
       const uniformName = "iChannel" + i;
-
       (this.uniforms as any)[uniformName] = {
-        value: textures[i],
+        value: texture,
       };
-
       const image = (this.uniforms as any)[uniformName]?.value?.image;
       if (image) {
-        this.uniforms.iChannelResolution.value[i] = new THREE.Vector3(
+        this.uniforms.iChannelResolution.value[i] = new Vector3(
           image.width,
           image.height,
           1
         );
       }
-    }
+    });
   }
 }

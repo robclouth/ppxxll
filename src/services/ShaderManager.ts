@@ -1,42 +1,11 @@
-import { makeAutoObservable, runInAction } from "mobx";
-import CameraManager from "./CameraManager";
-import { isPersisting, makePersistable } from "mobx-persist-store";
 import localForage from "localforage";
+import { makeAutoObservable, runInAction } from "mobx";
+import { makePersistable } from "mobx-persist-store";
+import { Parameter, Shader } from "../types";
+import CameraManager from "./CameraManager";
 
 const supportedTypes = ["float"];
 
-export type Parameter = {
-  name: string;
-  type: string;
-  defaultValue: number;
-  minValue: number;
-  maxValue: number;
-  value: number;
-};
-
-export type InputType = "camera" | "image";
-
-export type InputOutput = {
-  id: string;
-  src: string;
-  type: InputType;
-};
-
-export type Pass = {
-  code: string;
-  inputs: InputOutput[];
-  outputs: InputOutput[];
-  parameters: { [name: string]: Parameter };
-};
-
-export type Shader = {
-  id: string;
-  title: string;
-  description: string;
-  author: string;
-  passes: Pass[];
-  thumbnailUrl?: string;
-};
 const parameterPattern =
   /(const)?\s+(\w+)\s+(\w+)\s+=\s+(.*);\s+\/\/\s*@param\s+(min\s+(.*)),\s*(max\s+(.*))/g;
 
@@ -48,16 +17,18 @@ const ctypeToType: { [ctype: string]: string } = {
 class ShaderManager {
   shaders: { [id: string]: Shader } = {};
 
-  activeShader?: Shader;
+  activeShaderId?: string;
 
   constructor() {
     makeAutoObservable(this);
+
+    // clearPersistedStore(this);
   }
 
   async init() {
     await makePersistable(this, {
       name: "Shaders",
-      properties: ["shaders", "activeShader"],
+      properties: ["shaders", "activeShaderId"],
       storage: localForage,
       stringify: false,
     });
@@ -99,12 +70,12 @@ class ShaderManager {
             ...this.extractParameters(pass.code),
             inputs: pass.inputs.map((input: any) => ({
               id: input.id.toString(),
-              type: ctypeToType[input.ctype],
-              src: input.src,
+              type: "camera",
+              src: undefined,
             })),
             outputs: pass.outputs.map((input: any) => ({
               id: input.id.toString(),
-              type: [input.ctype],
+              type: "image",
               src: input.src,
             })),
           })),
@@ -115,13 +86,17 @@ class ShaderManager {
     }
   }
 
+  get activeShader() {
+    return this.activeShaderId ? this.shaders[this.activeShaderId] : undefined;
+  }
+
   deleteShader(id: string) {
     delete this.shaders[id];
   }
 
   setShader(shader: Shader) {
-    this.activeShader = shader;
-    CameraManager.setShader(this.activeShader);
+    this.activeShaderId = shader.id;
+    CameraManager.setShader(this.activeShader!);
   }
 
   extractMetadata(code: string) {

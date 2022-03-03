@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
-import { AdaptiveDpr, OrthographicCamera } from "@react-three/drei";
-import { Canvas, useThree } from "@react-three/fiber";
+import { AdaptiveDpr } from "@react-three/drei/core/AdaptiveDpr";
+import { OrthographicCamera } from "@react-three/drei/core/OrthographicCamera";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { observer } from "mobx-react";
 import { useEffect } from "react";
 import App from "../../services/App";
@@ -8,7 +9,7 @@ import CameraManager from "../../services/CameraManager";
 
 const ShaderQuad = observer(() => {
   const { material } = CameraManager;
-  const { gl, size } = useThree();
+  const { gl, size, invalidate } = useThree();
 
   useEffect(() => {
     CameraManager.setPreviewCanvas(gl.domElement);
@@ -17,6 +18,14 @@ const ShaderQuad = observer(() => {
   useEffect(() => {
     CameraManager.setPreviewCanvasSize(size.width, size.height);
   }, [size.width, size.height]);
+
+  useFrame(({ gl, scene, camera }) => {
+    gl.render(scene, camera);
+
+    if (CameraManager.shouldCapturePreview) {
+      CameraManager.finishPreviewCapture(gl.domElement.toDataURL());
+    }
+  }, 1);
 
   return (
     <mesh material={material}>
@@ -64,7 +73,7 @@ function GLView() {
       sx={{ touchAction: "none" }}
     >
       <Canvas
-        frameloop={CameraManager.isTakingPicture ? "demand" : "always"}
+        frameloop={CameraManager.shouldCapturePreview ? "demand" : "always"}
         linear
         flat
         dpr={[0.25, window.devicePixelRatio]}

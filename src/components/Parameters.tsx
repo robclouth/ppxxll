@@ -1,6 +1,7 @@
 import { Box, Drawer } from "@mui/material";
 import { observer } from "mobx-react";
-import ShaderManager, { Parameter } from "../services/ShaderManager";
+import ShaderManager from "../services/ShaderManager";
+import { Parameter } from "../types";
 import ParameterSlider from "./ParameterSlider";
 
 interface Props {
