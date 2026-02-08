@@ -1,7 +1,7 @@
 import { configure, makeAutoObservable } from "mobx";
-import CameraManager from "./CameraManager";
-import ShaderManager from "./ShaderManager";
-import TextureManager from "./TextureManager";
+import CameraManager from "./camera-manager";
+import ShaderManager from "./shader-manager";
+import TextureManager from "./texture-manager";
 import { Cache } from "three";
 
 Cache.enabled = true;
