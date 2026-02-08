@@ -73,8 +73,8 @@ class ExportManager {
 
     const exportSize = { ...App.exportSize };
 
-    // Get full-res textures for all inputs
-    const exportTextures = await CameraManager.getExportTextures();
+    // Get full-res textures (already captured at shutter time)
+    const exportTextures = CameraManager.getExportTextures();
 
     material.setSize(exportSize.width, exportSize.height);
     material.updateInputTextures(exportTextures);
@@ -166,9 +166,6 @@ class ExportManager {
     if (canvas) material.setSize(canvas.width, canvas.height);
     const previewTextures = CameraManager.getPreviewTextures();
     material.updateInputTextures(previewTextures);
-
-    // Restart camera stream
-    await CameraManager.startVideoStream(true);
 
     this.isExporting = false;
   }

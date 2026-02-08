@@ -138,6 +138,7 @@ function Camera() {
 
   function handlePhotoPreviewClose() {
     setPhotoPreviewOpen(false);
+    CameraManager.restoreLiveInputs();
     RenderManager.setRenderingActive(true);
   }
 

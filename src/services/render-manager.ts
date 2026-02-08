@@ -63,6 +63,10 @@ class RenderManager {
 
   async startPreviewCapture() {
     if (!this.material) return;
+
+    // Capture high-res photos for all live camera inputs NOW (at shutter press time)
+    await CameraManager.captureLiveInputs();
+
     this.shouldCapturePreview = true;
   }
 

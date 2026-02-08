@@ -1,6 +1,6 @@
 import { observer } from "mobx-react";
-import { useEffect, useRef } from "react";
-import { Camera, ImagePlus, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, ImagePlus, Image as ImageIcon, X } from "lucide-react";
 import CameraManager from "../services/camera-manager";
 import ShaderManager from "../services/shader-manager";
 import { Button } from "./ui/button";
@@ -11,7 +11,6 @@ import {
   DrawerDescription,
 } from "./ui/drawer";
 import { cn } from "../lib/utils";
-import { useState } from "react";
 
 /** Small live camera preview thumbnail */
 const CameraThumbnail = observer(({ size }: { size: number }) => {
@@ -116,6 +115,7 @@ function InputStrip() {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedInput, setSelectedInput] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!inputs || inputs.length === 0) return null;
 
@@ -134,6 +134,19 @@ function InputStrip() {
     if (selectedInput === null) return;
     CameraManager.setInputToCamera(selectedInput);
     setDrawerOpen(false);
+  }
+
+  function handleFromGallery() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || selectedInput === null) return;
+    setDrawerOpen(false);
+    await CameraManager.setInputFromFile(selectedInput, file);
+    // Reset so the same file can be re-selected
+    e.target.value = "";
   }
 
   function handleClear() {
@@ -155,6 +168,14 @@ function InputStrip() {
           <InputButton key={i} index={i} onAction={handleInputPress} />
         ))}
       </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileSelected}
+      />
 
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerContent>
@@ -180,6 +201,14 @@ function InputStrip() {
             >
               <ImagePlus className="h-5 w-5" />
               Take Photo
+            </Button>
+            <Button
+              variant="ghost"
+              className="justify-start gap-3 h-12 text-base"
+              onClick={handleFromGallery}
+            >
+              <ImageIcon className="h-5 w-5" />
+              From Gallery
             </Button>
             {hasCaptured && (
               <Button

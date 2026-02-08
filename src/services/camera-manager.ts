@@ -26,6 +26,8 @@ function downsizeToCanvas(
 export type InputCapture = {
   fullRes: HTMLCanvasElement;
   previewTexture: CanvasTexture;
+  /** true if this was auto-captured from a live camera input at shutter time */
+  fromLive?: boolean;
 };
 
 class CameraManager {
@@ -252,23 +254,82 @@ class CameraManager {
     return this.inputs.map((_, i) => this.getInputTexture(i));
   }
 
-  /** Get all input textures for export (full-res for captured, needs separate hi-res capture for live) */
-  async getExportTextures(): Promise<(Texture | undefined)[]> {
-    // Capture hi-res for any live camera inputs
-    let liveCapture: CanvasTexture | undefined;
-
+  /** Capture high-res photos for all live camera inputs (called at shutter press time) */
+  async captureLiveInputs() {
     const hasLiveInput = this.inputs.some((input) => input.type === "camera");
-    if (hasLiveInput) {
-      const fullRes = await this.captureHighResPhoto();
-      liveCapture = new CanvasTexture(fullRes);
-    }
+    if (!hasLiveInput) return;
 
+    const fullRes = await this.captureHighResPhoto();
+
+    // Store the capture for every live input
+    this.inputs.forEach((input, i) => {
+      if (input.type === "camera") {
+        const preview = downsizeToCanvas(fullRes, PREVIEW_MAX_DIM);
+        this.inputCaptures[i]?.previewTexture.dispose();
+        this.inputCaptures = {
+          ...this.inputCaptures,
+          [i]: { fullRes, previewTexture: new CanvasTexture(preview), fromLive: true },
+        };
+        input.type = "captured";
+      }
+    });
+
+    await this.startVideoStream(true);
+  }
+
+  /** Restore all captured-from-live inputs back to live camera */
+  restoreLiveInputs() {
+    this.inputs.forEach((input, i) => {
+      // Only restore inputs that were captured from live (not user-chosen photos)
+      if (input.type === "captured" && this.inputCaptures[i]?.fromLive) {
+        input.type = "camera";
+        this.inputCaptures[i]?.previewTexture.dispose();
+        const { [i]: _, ...rest } = this.inputCaptures;
+        this.inputCaptures = rest;
+      }
+    });
+  }
+
+  /** Get all input textures for export (full-res, already captured at shutter time) */
+  getExportTextures(): (Texture | undefined)[] {
     return this.inputs.map((input, i) => {
-      if (input.type === "captured" && this.inputCaptures[i]) {
+      if (this.inputCaptures[i]) {
         return new CanvasTexture(this.inputCaptures[i].fullRes);
       }
-      return liveCapture;
+      return this.cameraTexture;
     });
+  }
+
+  /** Load an image from a file and set it as a captured input */
+  async setInputFromFile(index: number, file: File) {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = reject;
+      img.src = url;
+    });
+
+    const fullRes = document.createElement("canvas");
+    fullRes.width = img.naturalWidth;
+    fullRes.height = img.naturalHeight;
+    const ctx = fullRes.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+
+    URL.revokeObjectURL(url);
+
+    const preview = downsizeToCanvas(fullRes, PREVIEW_MAX_DIM);
+    const previewTexture = new CanvasTexture(preview);
+
+    this.inputCaptures[index]?.previewTexture.dispose();
+    this.inputCaptures = {
+      ...this.inputCaptures,
+      [index]: { fullRes, previewTexture },
+    };
+
+    const input = this.inputs[index];
+    if (input) input.type = "captured";
   }
 }
 
