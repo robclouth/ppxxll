@@ -196,7 +196,7 @@ function Camera() {
       </div>
 
       {/* Camera controls row */}
-      <div className="flex-shrink-0 flex items-center justify-center gap-4 py-2">
+      <div className="flex-shrink-0 flex items-center py-2 px-4">
         <Button
           variant="ghost"
           size="icon"
@@ -205,14 +205,17 @@ function Camera() {
         >
           <SwitchCamera className="h-5 w-5" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-14 w-14 rounded-full border-2 border-white/30"
-          onClick={handleTakePicturePress}
-        >
-          <CameraIcon className="h-6 w-6" />
-        </Button>
+        <div className="flex-1 flex justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-14 w-14 rounded-full border-2 border-white/30"
+            onClick={handleTakePicturePress}
+          >
+            <CameraIcon className="h-6 w-6" />
+          </Button>
+        </div>
+        <div className="w-10" />
       </div>
 
       {/* Shader selector + aspect ratio row */}
