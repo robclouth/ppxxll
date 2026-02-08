@@ -1,7 +1,7 @@
 import { configure, makeAutoObservable } from "mobx";
 import CameraManager from "./camera-manager";
+import RenderManager from "./render-manager";
 import ShaderManager from "./shader-manager";
-import TextureManager from "./texture-manager";
 import { Cache } from "three";
 
 Cache.enabled = true;
@@ -32,8 +32,13 @@ class App {
   }
 
   async init() {
-    await Promise.all([ShaderManager.init(), TextureManager.init()]);
+    await ShaderManager.init();
     await CameraManager.init();
+    RenderManager.init();
+
+    if (ShaderManager.activeShader) {
+      RenderManager.setShader(ShaderManager.activeShader);
+    }
   }
 
   setPointerDown(x: number, y: number) {
@@ -47,7 +52,7 @@ class App {
       y,
     };
 
-    CameraManager.material.updateMouseUniforms(
+    RenderManager.material.updateMouseUniforms(
       this.isPointerDown,
       this.pointerPosition,
       this.pointerDownPosition
@@ -57,7 +62,7 @@ class App {
   setPointerUp(x: number, y: number) {
     this.isPointerDown = false;
 
-    CameraManager.material.updateMouseUniforms(
+    RenderManager.material.updateMouseUniforms(
       this.isPointerDown,
       this.pointerPosition,
       this.pointerDownPosition
@@ -70,7 +75,7 @@ class App {
       y,
     };
 
-    CameraManager.material.updateMouseUniforms(
+    RenderManager.material.updateMouseUniforms(
       this.isPointerDown,
       this.pointerPosition,
       this.pointerDownPosition

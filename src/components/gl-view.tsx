@@ -3,25 +3,25 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { observer } from "mobx-react";
 import { useEffect } from "react";
 import App from "../services/app";
-import CameraManager from "../services/camera-manager";
+import RenderManager from "../services/render-manager";
 
 const ShaderQuad = observer(() => {
-  const { material } = CameraManager;
+  const { material } = RenderManager;
   const { gl, size } = useThree();
 
   useEffect(() => {
-    CameraManager.setPreviewCanvas(gl.domElement);
+    RenderManager.setPreviewCanvas(gl.domElement);
   }, [gl.domElement]);
 
   useEffect(() => {
-    CameraManager.setPreviewCanvasSize(size.width, size.height);
+    RenderManager.setPreviewCanvasSize(size.width, size.height);
   }, [size.width, size.height]);
 
   useFrame(({ gl, scene, camera }) => {
-    if (CameraManager.isRenderingActive) gl.render(scene, camera);
+    if (RenderManager.isRenderingActive) gl.render(scene, camera);
 
-    if (CameraManager.shouldCapturePreview) {
-      CameraManager.finishPreviewCapture(gl.domElement.toDataURL());
+    if (RenderManager.shouldCapturePreview) {
+      RenderManager.finishPreviewCapture(gl.domElement.toDataURL());
     }
   }, 1);
 
@@ -68,7 +68,7 @@ function GLView() {
       onTouchMove={handlePointerMove}
     >
       <Canvas
-        frameloop={CameraManager.shouldCapturePreview ? "demand" : "always"}
+        frameloop={RenderManager.shouldCapturePreview ? "demand" : "always"}
         linear
         flat
         dpr={[0.25, window.devicePixelRatio]}

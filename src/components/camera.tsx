@@ -6,12 +6,14 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import CameraManager from "../services/camera-manager";
+import ExportManager from "../services/export-manager";
+import RenderManager from "../services/render-manager";
 import ShaderManager from "../services/shader-manager";
 import App from "../services/app";
-import ImageInputButton from "./image-input-button";
 import GLView from "./gl-view";
 import ShaderList from "./shader-list";
 import Parameters from "./parameters";
+import InputStrip from "./input-strip";
 import { observer } from "mobx-react";
 import ImagePreview from "./image-preview";
 import VideoPreview from "./video-preview";
@@ -35,8 +37,8 @@ const ASPECT_RATIOS = [
 ];
 
 const Progress = observer(() => {
-  const { photoProgress } = CameraManager;
-  if (!CameraManager.isExporting) return null;
+  const { photoProgress } = ExportManager;
+  if (!ExportManager.isExporting) return null;
   const pct = Math.min(photoProgress * 100, 100);
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -78,8 +80,6 @@ function useContainerSize(ref: React.RefObject<HTMLDivElement | null>) {
 }
 
 function Camera() {
-  const { activeShader } = ShaderManager;
-
   const [shaderListOpen, setShaderListOpen] = useState(false);
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
   const [videoPreviewOpen, setVideoPreviewOpen] = useState(false);
@@ -128,31 +128,32 @@ function Camera() {
 
   function handleShaderListClose() {
     setShaderListOpen(false);
-    CameraManager.setRenderingActive(true);
+    RenderManager.setRenderingActive(true);
   }
 
   function handleShaderListPress() {
     setShaderListOpen(true);
-    CameraManager.setRenderingActive(false);
+    RenderManager.setRenderingActive(false);
   }
 
   function handlePhotoPreviewClose() {
     setPhotoPreviewOpen(false);
-    CameraManager.setRenderingActive(true);
+    CameraManager.restoreLiveInputs();
+    RenderManager.setRenderingActive(true);
   }
 
   function handleVideoPreviewClose() {
     setVideoPreviewOpen(false);
-    CameraManager.setRenderingActive(true);
+    RenderManager.setRenderingActive(true);
   }
 
   async function handleTakePicturePress() {
-    if (CameraManager.mode === "photo") {
-      await CameraManager.startPreviewCapture();
+    if (ExportManager.mode === "photo") {
+      await RenderManager.startPreviewCapture();
       setPhotoPreviewOpen(true);
     } else {
-      if (!CameraManager.isRecording) CameraManager.startRecording();
-      else CameraManager.stopRecording();
+      if (!ExportManager.isRecording) ExportManager.startRecording();
+      else ExportManager.stopRecording();
     }
   }
 
@@ -179,20 +180,16 @@ function Camera() {
             <Progress />
           </div>
         )}
-        {/* Image input buttons */}
-        {activeShader?.passes[0].inputs &&
-          activeShader.passes[0].inputs.length > 0 && (
-            <div className="absolute left-2 top-1/2 -translate-y-1/2 flex flex-col">
-              {activeShader.passes[0].inputs.map((_input, i) => (
-                <ImageInputButton key={i} index={i} />
-              ))}
-            </div>
-          )}
       </div>
 
       {/* Parameters - always visible */}
       <div className="flex-shrink-0">
         <Parameters />
+      </div>
+
+      {/* Input strip - below parameters */}
+      <div className="flex-shrink-0">
+        <InputStrip />
       </div>
 
       {/* Camera controls row */}

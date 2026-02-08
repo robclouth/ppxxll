@@ -1,120 +1,62 @@
 import { makeAutoObservable } from "mobx";
 import {
   CanvasTexture,
-  Mesh,
-  OrthographicCamera,
-  PlaneGeometry,
-  Scene,
   Texture,
-  TextureLoader,
   VideoTexture,
-  WebGLRenderer,
 } from "three";
-import ShadertoyMaterial from "./shadertoy-material";
-import { InputOutput, Shader } from "../types";
-import App from "./app";
+import { InputOutput } from "../types";
 import ShaderManager from "./shader-manager";
-import { autorun } from "mobx";
 
-const maxChunkSize = 500;
+const PREVIEW_MAX_DIM = 1200;
 
-let messageId = 0;
-const pendingMessages = new Map<number, { resolve: Function; reject: Function }>();
-
-function createExportWorker() {
-  const worker = new Worker(
-    new URL("./export-thread.ts", import.meta.url),
-    { type: "module" }
-  );
-  worker.onmessage = (e: MessageEvent) => {
-    const { id, result, error } = e.data;
-    const pending = pendingMessages.get(id);
-    if (pending) {
-      pendingMessages.delete(id);
-      if (error) pending.reject(new Error(error));
-      else pending.resolve(result);
-    }
-  };
-  return worker;
+function downsizeToCanvas(
+  source: HTMLCanvasElement,
+  maxDim: number
+): HTMLCanvasElement {
+  const { width, height } = source;
+  const scale = Math.min(1, maxDim / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas;
 }
 
-function callWorker(worker: Worker, type: string, args: any, transfer?: Transferable[]): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = messageId++;
-    pendingMessages.set(id, { resolve, reject });
-    if (transfer) {
-      worker.postMessage({ type, id, args }, transfer);
-    } else {
-      worker.postMessage({ type, id, args });
-    }
-  });
-}
+export type InputCapture = {
+  fullRes: HTMLCanvasElement;
+  previewTexture: CanvasTexture;
+  /** true if this was auto-captured from a live camera input at shutter time */
+  fromLive?: boolean;
+};
 
 class CameraManager {
-  material: ShadertoyMaterial;
-
-  shouldCapturePreview = false;
-  isRecording = false;
-  isExporting = false;
-  photoProgress = 0;
-
-  mode: "photo" | "video" = "photo";
   mediaStream?: MediaStream;
-  mediaRecorder?: MediaRecorder;
   cameraTexture?: VideoTexture;
-  inputTextures: (Texture | undefined)[] = [];
-
-  latestPhotoCapture?: HTMLCanvasElement;
-
-  latestPreviewUrl?: string;
-
-  latestExportBlob?: Blob;
-
-  latestVideoBlob?: Blob;
-
-  canvas?: HTMLCanvasElement;
 
   activeCamera: "front" | "back" = "back";
   frontCameraDeviceId?: string;
   backCameraDeviceId?: string;
 
-  isRenderingActive = true;
+  /** Per-input captured photo data (index -> capture) */
+  inputCaptures: { [index: number]: InputCapture } = {};
+
+  /** Whether we're in "capture for input" mode */
+  capturingForInput: number | null = null;
 
   constructor() {
     makeAutoObservable(this);
-    this.material = new ShadertoyMaterial();
   }
 
   get inputs(): InputOutput[] {
     const activeShader = ShaderManager.activeShader;
-
     if (activeShader) return activeShader.passes[0].inputs;
-    else return [{ type: "camera" }];
+    return [{ type: "camera" }];
   }
 
   async init() {
     await this.detectCameras();
-    await this.startVideoCapture();
-
-    autorun(async () => {
-      this.inputTextures = await Promise.all(
-        this.inputs.map(({ type, url }) => {
-          if (url) {
-            return new Promise<Texture>((resolve, reject) => {
-              new TextureLoader()
-                .setCrossOrigin("anonymous")
-                .load(url, (texture) => {
-                  resolve(texture);
-                });
-            });
-          } else if (type === "camera") {
-            return Promise.resolve<Texture>(this.cameraTexture as Texture);
-          }
-        })
-      );
-    });
-
-    if (ShaderManager.activeShader) this.setShader(ShaderManager.activeShader);
+    await this.startVideoStream();
   }
 
   async detectCameras() {
@@ -126,11 +68,9 @@ class CameraManager {
       let frontDeviceId;
       let backDeviceId;
       if (devices.length > 0) {
-        /* defaults so all this will work on a desktop */
         frontDeviceId = devices[0].deviceId;
         backDeviceId = devices[0].deviceId;
       }
-      /* look for front and back devices */
       devices.forEach((device) => {
         if (device.kind === "videoinput") {
           if (device.label && device.label.length > 0) {
@@ -142,33 +82,26 @@ class CameraManager {
           }
         }
       });
-
       this.frontCameraDeviceId = frontDeviceId;
       this.backCameraDeviceId = backDeviceId;
-
-      tempStream.getTracks().forEach((track) => {
-        track.stop();
-      });
+      tempStream.getTracks().forEach((track) => track.stop());
     } catch (error) {
       console.error(`Unable to get cameras: ${error}`);
     }
   }
 
-  async startVideoCapture(preview = true) {
+  async startVideoStream(preview = true) {
     try {
       if (this.mediaStream) {
-        this.mediaStream.getTracks().forEach((track) => {
-          track.stop();
-        });
+        this.mediaStream.getTracks().forEach((track) => track.stop());
       }
-
       if (this.cameraTexture) this.cameraTexture.dispose();
 
       const constraints = {
         audio: false,
         video: {
           width: { ideal: preview ? 1200 : 4000 },
-          height: { ideal: preview ? 1200 * 0.75 : 3000 },
+          height: { ideal: preview ? 900 : 3000 },
           deviceId: {
             exact:
               this.activeCamera === "front"
@@ -179,10 +112,8 @@ class CameraManager {
       };
 
       this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-
       const mediaStreamTrack = this.mediaStream.getVideoTracks()[0];
-      let { width, height } = mediaStreamTrack.getSettings();
-
+      const { width, height } = mediaStreamTrack.getSettings();
       console.log(`Stream res: ${width}:${height}`);
 
       const video = document.createElement("video");
@@ -209,313 +140,196 @@ class CameraManager {
 
   switchCamera() {
     this.activeCamera = this.activeCamera === "front" ? "back" : "front";
-    this.startVideoCapture();
+    this.startVideoStream();
   }
 
-  setShader(shader: Shader) {
-    if (this.material) this.material.dispose();
-
-    this.material = new ShadertoyMaterial(shader);
-    this.material?.setSize(this.canvas!.width, this.canvas!.height);
-    this.material.updateInputTextures(this.inputTextures);
-  }
-
-  setPreviewCanvas(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
-  }
-
-  setPreviewCanvasSize(width: number, height: number) {
-    if (!this.isExporting) this.material?.setSize(width, height);
-  }
-
-  setInputTexture(index: number, texture?: Texture) {
-    this.inputTextures[index] = texture;
-    this.material.updateInputTextures(this.inputTextures);
-  }
-
-  setRenderingActive(active: boolean) {
-    this.isRenderingActive = active;
-
-    if (this.cameraTexture?.image) {
-      if (active) (this.cameraTexture.image as HTMLVideoElement).play();
-      else (this.cameraTexture.image as HTMLVideoElement).pause();
-    }
-
-    if (this.material) {
-      this.material.shouldUpdateUniforms = active;
-    }
-  }
-
-  startRecording() {
-    if (!this.canvas) return;
-
-    try {
-      const stream = this.canvas.captureStream(App.outputFps);
-      this.mediaRecorder = new MediaRecorder(stream);
-      this.mediaRecorder.addEventListener("dataavailable", (e) => {
-        const videoData = [e.data];
-        this.latestVideoBlob = new Blob(videoData, { type: "video/webm" });
-      });
-
-      this.mediaRecorder.start();
-
-      this.isRecording = true;
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  stopRecording() {
-    if (this.mediaRecorder) {
-      this.mediaRecorder.stop();
-      this.isRecording = false;
-    }
-  }
-
-  async capturePhoto() {
-    try {
-      if (this.mediaStream) {
-        this.mediaStream.getTracks().forEach((track) => {
-          track.stop();
-        });
-      }
-
-      const constraints = {
-        audio: false,
-        video: {
-          width: { ideal: 8000 },
-          height: { ideal: 8000 * 0.75 },
-          deviceId: {
-            exact:
-              this.activeCamera === "front"
-                ? this.frontCameraDeviceId
-                : this.backCameraDeviceId,
-          },
-        },
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-      const mediaStreamTrack = stream.getVideoTracks()[0];
-      let { width, height } = mediaStreamTrack.getSettings();
-
-      console.log(`Take photo res: ${width}:${height}`);
-
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      video.width = width!;
-      video.height = height!;
-
-      this.latestPhotoCapture = document.createElement("canvas");
-      const context = this.latestPhotoCapture.getContext("2d")!;
-
-      video.srcObject = stream;
-
-      await new Promise<void>((resolve, reject) => {
-        video.addEventListener("loadeddata", async () => {
-          const { videoWidth, videoHeight } = video;
-          this.latestPhotoCapture!.width = videoWidth;
-          this.latestPhotoCapture!.height = videoHeight;
-
-          try {
-            await video.play();
-            context.drawImage(video, 0, 0, videoWidth, videoHeight);
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        });
-      });
-    } catch (error) {
-      console.error(`Unable to take photo: ${error}`);
-    }
-  }
-
-  async startPreviewCapture() {
-    if (!this.material) return;
-
-    this.shouldCapturePreview = true;
-    this.latestExportBlob = undefined;
-  }
-
-  async finishPreviewCapture(dataUrl: string) {
-    this.latestPreviewUrl = dataUrl;
-    this.shouldCapturePreview = false;
-
+  /** Capture a high-res photo from the camera and return it as a canvas */
+  async captureHighResPhoto(): Promise<HTMLCanvasElement> {
+    // Stop current stream temporarily
     if (this.mediaStream) {
-      this.latestPhotoCapture = undefined;
-      await this.capturePhoto();
-      await this.startVideoCapture(true);
+      this.mediaStream.getTracks().forEach((track) => track.stop());
     }
 
-    this.setRenderingActive(false);
-  }
+    const constraints = {
+      audio: false,
+      video: {
+        width: { ideal: 8000 },
+        height: { ideal: 6000 },
+        deviceId: {
+          exact:
+            this.activeCamera === "front"
+              ? this.frontCameraDeviceId
+              : this.backCameraDeviceId,
+        },
+      },
+    };
 
-  async exportImage() {
-    if (!this.material) return;
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const mediaStreamTrack = stream.getVideoTracks()[0];
+    const { width, height } = mediaStreamTrack.getSettings();
+    console.log(`Capture res: ${width}:${height}`);
 
-    this.isExporting = true;
-    this.photoProgress = 0;
+    const video = document.createElement("video");
+    video.srcObject = stream;
+    video.width = width!;
+    video.height = height!;
 
-    const exportSize = { ...App.exportSize };
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
 
-    (this.cameraTexture?.image as HTMLVideoElement)?.pause();
-
-    const shaderInputTextures = [...this.inputTextures];
-
-    if (this.latestPhotoCapture) {
-      const texture = new CanvasTexture(this.latestPhotoCapture);
-
-      this.inputs.forEach(({ type }, i) => {
-        if (type === "camera") {
-          shaderInputTextures[i] = texture;
+    await new Promise<void>((resolve, reject) => {
+      video.addEventListener("loadeddata", async () => {
+        const { videoWidth, videoHeight } = video;
+        canvas.width = videoWidth;
+        canvas.height = videoHeight;
+        try {
+          await video.play();
+          ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
+          resolve();
+        } catch (error) {
+          reject(error);
         }
       });
-    }
+    });
 
-    const worker = createExportWorker();
-    await callWorker(worker, "start", { width: exportSize.width, height: exportSize.height });
-
-    this.material.setSize(exportSize.width, exportSize.height);
-    this.material.updateInputTextures(shaderInputTextures);
-
-    const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    camera.position.z = 1;
-    const scene = new Scene();
-    const quad = new Mesh(new PlaneGeometry(2, 2, 1, 1), this.material);
-    scene.add(quad);
-
-    const renderer = new WebGLRenderer({ alpha: true });
-
-    const totalChunks =
-      Math.ceil(exportSize.width / maxChunkSize) *
-      Math.ceil(exportSize.height / maxChunkSize);
-    let numChunksProcessed = 0;
-
-    for (let chunkY = 0; chunkY < exportSize.height; chunkY += maxChunkSize) {
-      const chunkHeight = Math.min(maxChunkSize, exportSize.height - chunkY);
-
-      const rowChunks = [];
-      for (let chunkX = 0; chunkX < exportSize.width; chunkX += maxChunkSize) {
-        const chunkWidth = Math.min(maxChunkSize, exportSize.width - chunkX);
-        const chunkBuffer = new ArrayBuffer(chunkWidth * chunkHeight * 4);
-
-        renderer.setSize(chunkWidth, chunkHeight);
-
-        camera.setViewOffset(
-          exportSize.width,
-          exportSize.height,
-          chunkX,
-          chunkY,
-          chunkWidth,
-          chunkHeight
-        );
-        camera.updateProjectionMatrix();
-
-        renderer.render(scene, camera);
-
-        const gl = renderer.getContext();
-
-        const uintArray = new Uint8Array(chunkBuffer);
-
-        gl.readPixels(
-          0,
-          0,
-          chunkWidth,
-          chunkHeight,
-          gl.RGBA,
-          gl.UNSIGNED_BYTE,
-          uintArray
-        );
-
-        rowChunks.push({ chunkBuffer, chunkWidth, chunkHeight });
-
-        numChunksProcessed++;
-
-        this.photoProgress = numChunksProcessed / totalChunks;
-        console.log(this.photoProgress);
-      }
-
-      const buffers = rowChunks.map((chunk) => chunk.chunkBuffer);
-      await callWorker(
-        worker,
-        "addRowChunks",
-        {
-          buffers,
-          widths: rowChunks.map((chunk) => chunk.chunkWidth),
-          height: chunkHeight,
-        },
-        buffers
-      );
-    }
-
-    renderer.dispose();
-
-    const imageBuffer = await callWorker(worker, "finish", {});
-    this.latestExportBlob = new Blob([imageBuffer]);
-
-    worker.terminate();
-
-    this.material.setSize(this.canvas!.width, this.canvas!.height);
-    this.material.updateInputTextures(this.inputTextures);
-
-    this.isExporting = false;
+    stream.getTracks().forEach((track) => track.stop());
+    return canvas;
   }
 
-  async shareExport() {
-    if (!this.latestExportBlob) await this.exportImage();
+  /** Capture a photo for a specific input index */
+  async captureForInput(index: number) {
+    this.capturingForInput = index;
 
-    this.shareFile(this.latestExportBlob!, "png");
-  }
+    try {
+      const fullRes = await this.captureHighResPhoto();
+      const preview = downsizeToCanvas(fullRes, PREVIEW_MAX_DIM);
+      const previewTexture = new CanvasTexture(preview);
 
-  shareVideo() {
-    if (this.latestVideoBlob) this.shareFile(this.latestVideoBlob, "webm");
-  }
+      // Dispose old capture texture if exists
+      this.inputCaptures[index]?.previewTexture.dispose();
 
-  shareFile(blob: Blob, extension: string) {
-    const filename = `${new Date().getTime()}.${extension}`;
-    const files = [
-      new File([blob], filename, {
-        type: "video/webm",
-        lastModified: new Date().getTime(),
-      }),
-    ];
-
-    if (navigator.canShare && navigator.canShare({ files })) {
-      const shareData = {
-        files,
+      this.inputCaptures = {
+        ...this.inputCaptures,
+        [index]: { fullRes, previewTexture },
       };
-      navigator.share(shareData);
-    } else throw new Error("Share not available");
+
+      // Update the input type
+      const input = this.inputs[index];
+      if (input) input.type = "captured";
+    } finally {
+      this.capturingForInput = null;
+      await this.startVideoStream(true);
+    }
   }
 
-  async downloadExport() {
-    if (!this.latestExportBlob) await this.exportImage();
+  /** Set an input back to live camera */
+  setInputToCamera(index: number) {
+    const input = this.inputs[index];
+    if (input) input.type = "camera";
 
-    const url = URL.createObjectURL(this.latestExportBlob!);
-    this.downloadFile(url, "png");
+    // Dispose and remove capture
+    this.inputCaptures[index]?.previewTexture.dispose();
+    const { [index]: _, ...rest } = this.inputCaptures;
+    this.inputCaptures = rest;
+  }
+
+  /** Clear an input (same as setting to camera) */
+  clearInput(index: number) {
+    this.setInputToCamera(index);
+  }
+
+  /** Get the preview texture for an input (either camera or captured) */
+  getInputTexture(index: number): Texture | undefined {
+    const input = this.inputs[index];
+    if (!input) return undefined;
+
+    if (input.type === "captured" && this.inputCaptures[index]) {
+      return this.inputCaptures[index].previewTexture;
+    }
+    return this.cameraTexture;
+  }
+
+  /** Get all input textures for preview rendering */
+  getPreviewTextures(): (Texture | undefined)[] {
+    return this.inputs.map((_, i) => this.getInputTexture(i));
+  }
+
+  /** Capture high-res photos for all live camera inputs (called at shutter press time) */
+  async captureLiveInputs() {
+    const hasLiveInput = this.inputs.some((input) => input.type === "camera");
+    if (!hasLiveInput) return;
+
+    const fullRes = await this.captureHighResPhoto();
+
+    // Store the capture for every live input
+    this.inputs.forEach((input, i) => {
+      if (input.type === "camera") {
+        const preview = downsizeToCanvas(fullRes, PREVIEW_MAX_DIM);
+        this.inputCaptures[i]?.previewTexture.dispose();
+        this.inputCaptures = {
+          ...this.inputCaptures,
+          [i]: { fullRes, previewTexture: new CanvasTexture(preview), fromLive: true },
+        };
+        input.type = "captured";
+      }
+    });
+
+    await this.startVideoStream(true);
+  }
+
+  /** Restore all captured-from-live inputs back to live camera */
+  restoreLiveInputs() {
+    this.inputs.forEach((input, i) => {
+      // Only restore inputs that were captured from live (not user-chosen photos)
+      if (input.type === "captured" && this.inputCaptures[i]?.fromLive) {
+        input.type = "camera";
+        this.inputCaptures[i]?.previewTexture.dispose();
+        const { [i]: _, ...rest } = this.inputCaptures;
+        this.inputCaptures = rest;
+      }
+    });
+  }
+
+  /** Get all input textures for export (full-res, already captured at shutter time) */
+  getExportTextures(): (Texture | undefined)[] {
+    return this.inputs.map((input, i) => {
+      if (this.inputCaptures[i]) {
+        return new CanvasTexture(this.inputCaptures[i].fullRes);
+      }
+      return this.cameraTexture;
+    });
+  }
+
+  /** Load an image from a file and set it as a captured input */
+  async setInputFromFile(index: number, file: File) {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = reject;
+      img.src = url;
+    });
+
+    const fullRes = document.createElement("canvas");
+    fullRes.width = img.naturalWidth;
+    fullRes.height = img.naturalHeight;
+    const ctx = fullRes.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+
     URL.revokeObjectURL(url);
-  }
 
-  downloadVideo() {
-    if (!this.latestVideoBlob) return;
+    const preview = downsizeToCanvas(fullRes, PREVIEW_MAX_DIM);
+    const previewTexture = new CanvasTexture(preview);
 
-    const url = URL.createObjectURL(this.latestVideoBlob);
-    this.downloadFile(url, "webm");
-    URL.revokeObjectURL(url);
-  }
+    this.inputCaptures[index]?.previewTexture.dispose();
+    this.inputCaptures = {
+      ...this.inputCaptures,
+      [index]: { fullRes, previewTexture },
+    };
 
-  downloadFile(url: string, extension: string) {
-    const filename = `${new Date().getTime()}.${extension}`;
-
-    const a = document.createElement("a");
-    document.body.appendChild(a);
-    (a as any).style = "display: none";
-    a.href = url;
-    a.download = filename;
-    a.click();
-
-    document.body.removeChild(a);
+    const input = this.inputs[index];
+    if (input) input.type = "captured";
   }
 }
 
