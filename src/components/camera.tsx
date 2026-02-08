@@ -109,9 +109,10 @@ function Camera() {
     }
   })();
 
-  // Update export size when aspect ratio changes
+  // Update export size when aspect ratio changes, preserving current resolution
   useEffect(() => {
-    const baseSize = 4000;
+    const currentLongest = Math.max(App.exportSize.width, App.exportSize.height);
+    const baseSize = currentLongest || 3840;
     const ratio = aspectRatio.w / aspectRatio.h;
     if (ratio >= 1) {
       App.exportSize = {
@@ -124,6 +125,7 @@ function Camera() {
         height: baseSize,
       };
     }
+    ExportManager.latestExportBlob = undefined;
   }, [aspectRatio]);
 
   function handleShaderListClose() {
@@ -216,19 +218,19 @@ function Camera() {
       </div>
 
       {/* Shader selector + aspect ratio row */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 pb-3">
+      <div className="flex-shrink-0 flex items-center gap-2 px-4 pb-3">
         <Button
           variant="ghost"
-          className="max-w-[40%] truncate text-sm px-2"
+          className="flex-1 min-w-0 truncate text-sm px-2 justify-start"
           onClick={handleShaderListPress}
         >
-          {ShaderManager.activeShader?.title || "None"}
+          <span className="truncate">{ShaderManager.activeShader?.title || "None"}</span>
           <ChevronDown className="h-4 w-4 ml-1 flex-shrink-0" />
         </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="text-sm px-2 gap-1">
+            <Button variant="ghost" className="flex-shrink-0 text-sm px-2 gap-1">
               <Crop className="h-4 w-4" />
               {aspectRatio.label}
             </Button>

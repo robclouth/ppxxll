@@ -1,18 +1,25 @@
-import { Plus, ChevronDown, Check } from "lucide-react";
+import { Plus, Check } from "lucide-react";
 import { observer } from "mobx-react";
 import { useState } from "react";
 import ShaderManager from "../services/shader-manager";
 import { Shader } from "../types";
 import ItemMenu from "./item-menu";
 import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from "./ui/drawer";
+import {
   Dialog,
-  DialogFullScreen,
   DialogContent,
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { cn } from "../lib/utils";
 
 interface Props {
   open: boolean;
@@ -60,18 +67,15 @@ function ShaderList({ open, onClose }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogFullScreen>
-        <div className="flex items-center px-4 py-3 bg-neutral-800">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            aria-label="close"
-          >
-            <ChevronDown className="h-5 w-5" />
-          </Button>
-          <h2 className="ml-2 flex-1 text-lg font-semibold">Shaders</h2>
+    <Drawer open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DrawerContent className="max-h-[85vh]">
+        <DrawerHeader className="flex flex-row items-center justify-between">
+          <div>
+            <DrawerTitle>Shaders</DrawerTitle>
+            <DrawerDescription className="sr-only">
+              Select a shader effect
+            </DrawerDescription>
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -80,24 +84,28 @@ function ShaderList({ open, onClose }: Props) {
           >
             <Plus className="h-5 w-5" />
           </Button>
-        </div>
-        <div className="flex-1 overflow-y-auto">
+        </DrawerHeader>
+        <div className="flex-1 overflow-y-auto px-2 pb-4">
           {Object.values(ShaderManager.shaders).map((shader) => (
             <div
               key={shader.id}
-              className="flex items-center hover:bg-white/5"
+              className={cn(
+                "flex items-center rounded-md",
+                "hover:bg-white/5",
+                ShaderManager.activeShader === shader && "bg-white/5"
+              )}
             >
               <button
-                className="flex-1 flex items-center px-4 py-3 text-left cursor-pointer"
+                className="flex-1 flex items-center gap-3 px-3 py-2.5 text-left cursor-pointer"
                 onClick={() => handleSelectShader(shader)}
               >
-                <div className="w-8 flex-shrink-0">
+                <div className="w-5 flex-shrink-0">
                   {ShaderManager.activeShader === shader && (
-                    <Check className="h-5 w-5 text-white" />
+                    <Check className="h-4 w-4 text-white" />
                   )}
                 </div>
-                <div>
-                  <div className="text-sm">{shader.title}</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{shader.title}</div>
                   <div className="text-xs text-white/50">{shader.author}</div>
                 </div>
               </button>
@@ -107,7 +115,7 @@ function ShaderList({ open, onClose }: Props) {
                   if (index === 0) handleShaderDelete(shader.id);
                   else if (index === 1) handleGoToShadertoy(shader.id);
                 }}
-                className="mr-2"
+                className="mr-1"
               />
             </div>
           ))}
@@ -137,8 +145,8 @@ function ShaderList({ open, onClose }: Props) {
             </div>
           </DialogContent>
         </Dialog>
-      </DialogFullScreen>
-    </Dialog>
+      </DrawerContent>
+    </Drawer>
   );
 }
 
