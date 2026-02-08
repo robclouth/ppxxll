@@ -1,10 +1,9 @@
 import { X, Share, Download } from "lucide-react";
 import { observer } from "mobx-react";
-import { useCallback, useRef } from "react";
 import ExportManager from "../services/export-manager";
 import RenderManager from "../services/render-manager";
 import App from "../services/app";
-import QuickPinchZoom, { make3dTransformValue } from "react-quick-pinch-zoom";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { Dialog, DialogFullScreen } from "./ui/dialog";
 import { Button } from "./ui/button";
 import {
@@ -30,16 +29,6 @@ interface Props {
 
 function ImagePreview({ open, onClose }: Props) {
   const { latestPreviewUrl } = RenderManager;
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  const onUpdate = useCallback(({ x, y, scale }: { x: number; y: number; scale: number }) => {
-    const { current: img } = imgRef;
-
-    if (img) {
-      const value = make3dTransformValue({ x, y, scale });
-      img.style.setProperty("transform", value);
-    }
-  }, []);
 
   const currentResolution = RESOLUTION_PRESETS.find(
     (r) => r.size === Math.max(App.exportSize.width, App.exportSize.height)
@@ -58,13 +47,11 @@ function ImagePreview({ open, onClose }: Props) {
         height: preset.size,
       };
     }
-    // Clear cached export so next share/download re-exports at new resolution
     ExportManager.latestExportBlob = undefined;
   }
 
   function handleFormatChange(format: "png" | "jpeg") {
     ExportManager.exportFormat = format;
-    // Clear cached export so next share/download re-exports with new format
     ExportManager.latestExportBlob = undefined;
   }
 
@@ -95,24 +82,30 @@ function ImagePreview({ open, onClose }: Props) {
           </Button>
         </div>
 
-        {/* Pinch-zoomable preview - fills all available space, image centered within */}
-        <div className="flex-1 min-h-0 overflow-hidden relative">
+        {/* Pinch-zoomable preview - wrapper fills space, content centered */}
+        <div className="flex-1 min-h-0">
           {latestPreviewUrl && (
-            <QuickPinchZoom onUpdate={onUpdate} containerProps={{ style: { width: "100%", height: "100%" } }}>
-              <div className="w-full h-full flex items-center justify-center">
+            <TransformWrapper
+              centerOnInit
+              minScale={0.5}
+              maxScale={10}
+            >
+              <TransformComponent
+                wrapperStyle={{ width: "100%", height: "100%" }}
+                contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
                 <img
-                  ref={imgRef}
                   src={latestPreviewUrl}
                   className="max-w-full max-h-full object-contain"
                 />
-              </div>
-            </QuickPinchZoom>
+              </TransformComponent>
+            </TransformWrapper>
           )}
         </div>
 
         {/* Bottom controls */}
         <div className="flex-shrink-0 p-4 space-y-3">
-          {/* Format + Resolution row */}
+          {/* Format + Resolution + actions row */}
           <div className="flex items-center gap-2">
             {/* Format selector */}
             <DropdownMenu>
