@@ -43,7 +43,7 @@ function ParameterSlider({ parameter }: Props) {
     (e: React.PointerEvent) => {
       if (!dragRef.current.isDragging) return;
       const dx = e.clientX - dragRef.current.startX;
-      const valueDelta = (dx / PIXELS_PER_RANGE) * range;
+      const valueDelta = (-dx / PIXELS_PER_RANGE) * range;
       const newValue = Math.max(
         parameter.minValue,
         Math.min(parameter.maxValue, dragRef.current.startValue + valueDelta)
@@ -65,8 +65,8 @@ function ParameterSlider({ parameter }: Props) {
     Math.abs(parameter.value - parameter.defaultValue) > 0.001;
 
   return (
-    <div className="flex items-center gap-2 bg-zinc-800/80 rounded-full px-4 py-2.5 mx-4">
-      <span className="text-sm font-medium text-white/90 min-w-[2.5rem] text-right tabular-nums">
+    <div className="flex items-center bg-zinc-800/80 rounded-full px-3 py-2.5 mx-4">
+      <span className="text-sm font-medium text-white/90 w-10 text-center tabular-nums flex-shrink-0">
         {formatValue(parameter.value, range)}
       </span>
       <div
@@ -123,7 +123,7 @@ function ParameterSlider({ parameter }: Props) {
       </div>
       <button
         onClick={handleReset}
-        className={`p-1 transition-opacity cursor-pointer ${isModified ? "text-white/80 hover:text-white" : "text-white/20"}`}
+        className={`w-10 flex items-center justify-center flex-shrink-0 transition-opacity cursor-pointer ${isModified ? "text-white/80 hover:text-white" : "text-white/20"}`}
         disabled={!isModified}
       >
         <RotateCcw className="h-4 w-4" />

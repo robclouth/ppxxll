@@ -166,9 +166,9 @@ function Camera() {
 
   return (
     <FullScreen handle={handle} className="fullscreen">
-      <div className="w-full h-full flex flex-col bg-black">
+      <div className="w-full h-full flex flex-col bg-black overflow-hidden">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-3 py-2 z-10">
+        <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 z-10">
           <Button
             variant="default"
             className="max-w-[50%] truncate"
@@ -252,10 +252,12 @@ function Camera() {
         </div>
 
         {/* Parameters - always visible */}
-        <Parameters />
+        <div className="flex-shrink-0">
+          <Parameters />
+        </div>
 
         {/* Bottom action buttons */}
-        <div className="flex items-center justify-between px-6 py-3">
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-3">
           <Button
             variant="default"
             size="icon"
