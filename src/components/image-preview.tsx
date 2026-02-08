@@ -95,15 +95,17 @@ function ImagePreview({ open, onClose }: Props) {
           </Button>
         </div>
 
-        {/* Centered preview image */}
-        <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+        {/* Pinch-zoomable preview - fills all available space, image centered within */}
+        <div className="flex-1 min-h-0 overflow-hidden relative">
           {latestPreviewUrl && (
-            <QuickPinchZoom onUpdate={onUpdate}>
-              <img
-                ref={imgRef}
-                src={latestPreviewUrl}
-                className="max-w-full max-h-full object-contain"
-              />
+            <QuickPinchZoom onUpdate={onUpdate} containerProps={{ style: { width: "100%", height: "100%" } }}>
+              <div className="w-full h-full flex items-center justify-center">
+                <img
+                  ref={imgRef}
+                  src={latestPreviewUrl}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
             </QuickPinchZoom>
           )}
         </div>

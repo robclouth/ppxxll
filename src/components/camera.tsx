@@ -1,5 +1,5 @@
 import {
-  ChevronDown,
+  ChevronUp,
   Camera as CameraIcon,
   SwitchCamera,
   Crop,
@@ -224,8 +224,8 @@ function Camera() {
           className="flex-1 min-w-0 truncate text-sm px-2 justify-start"
           onClick={handleShaderListPress}
         >
+          <ChevronUp className="h-4 w-4 mr-1 flex-shrink-0" />
           <span className="truncate">{ShaderManager.activeShader?.title || "None"}</span>
-          <ChevronDown className="h-4 w-4 ml-1 flex-shrink-0" />
         </Button>
 
         <DropdownMenu>
