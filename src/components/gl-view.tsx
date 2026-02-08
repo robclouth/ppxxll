@@ -1,11 +1,9 @@
-import { Box } from "@mui/material";
-import { AdaptiveDpr } from "@react-three/drei";
-import { OrthographicCamera } from "@react-three/drei";
+import { AdaptiveDpr, OrthographicCamera } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { observer } from "mobx-react";
 import { useEffect } from "react";
-import App from "../../services/App";
-import CameraManager from "../../services/CameraManager";
+import App from "../services/app";
+import CameraManager from "../services/camera-manager";
 
 const ShaderQuad = observer(() => {
   const { material } = CameraManager;
@@ -60,17 +58,14 @@ function handlePointerMove(e: any) {
 
 function GLView() {
   return (
-    <Box
-      component="div"
+    <div
+      className="w-full h-full touch-none"
       onMouseDown={handlePointerDown}
       onTouchStart={handlePointerDown}
       onMouseUp={handlePointerUp}
       onTouchEnd={handlePointerUp}
       onMouseMove={handlePointerMove}
       onTouchMove={handlePointerMove}
-      width={"100%"}
-      height={"100%"}
-      sx={{ touchAction: "none" }}
     >
       <Canvas
         frameloop={CameraManager.shouldCapturePreview ? "demand" : "always"}
@@ -93,7 +88,7 @@ function GLView() {
         <ShaderQuad />
         <AdaptiveDpr pixelated />
       </Canvas>
-    </Box>
+    </div>
   );
 }
 
