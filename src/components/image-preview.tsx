@@ -1,4 +1,4 @@
-import { Share, Download } from "lucide-react";
+import { X, Share, Download } from "lucide-react";
 import { observer } from "mobx-react";
 import ExportManager from "../services/export-manager";
 import RenderManager from "../services/render-manager";
@@ -7,7 +7,6 @@ import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
   Drawer,
   DrawerContent,
-  DrawerHeader,
   DrawerTitle,
   DrawerDescription,
 } from "./ui/drawer";
@@ -74,12 +73,20 @@ function ImagePreview({ open, onClose }: Props) {
   }
 
   return (
-    <Drawer open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DrawerContent className="h-[92vh] max-h-[92vh]">
-        <DrawerHeader className="sr-only">
+    <Drawer open={open} onOpenChange={(isOpen) => !isOpen && onClose()} dismissible={false}>
+      <DrawerContent className="h-[92vh] max-h-[92vh] [&>div:first-child]:hidden">
+        <div className="flex-shrink-0 flex items-center justify-between px-4 pt-3 pb-1">
           <DrawerTitle>Preview</DrawerTitle>
-          <DrawerDescription>Photo preview</DrawerDescription>
-        </DrawerHeader>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="close"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+        <DrawerDescription className="sr-only">Photo preview</DrawerDescription>
 
         {/* Pinch-zoomable preview - wrapper fills space, content centered */}
         <div className="flex-1 min-h-0">
