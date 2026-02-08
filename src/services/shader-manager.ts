@@ -2,7 +2,7 @@ import localForage from "localforage";
 import { makeAutoObservable, runInAction } from "mobx";
 import { makePersistable } from "mobx-persist-store";
 import { Parameter, Shader } from "../types";
-import CameraManager from "./CameraManager";
+import CameraManager from "./camera-manager";
 
 const supportedTypes = ["float"];
 
@@ -21,8 +21,6 @@ class ShaderManager {
 
   constructor() {
     makeAutoObservable(this);
-
-    // clearPersistedStore(this);
   }
 
   async init() {

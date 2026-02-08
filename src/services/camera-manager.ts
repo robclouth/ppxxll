@@ -10,10 +10,10 @@ import {
   VideoTexture,
   WebGLRenderer,
 } from "three";
-import ShadertoyMaterial from "./ShadertoyMaterial";
+import ShadertoyMaterial from "./shadertoy-material";
 import { InputOutput, Shader } from "../types";
-import App from "./App";
-import ShaderManager from "./ShaderManager";
+import App from "./app";
+import ShaderManager from "./shader-manager";
 import { autorun } from "mobx";
 
 const maxChunkSize = 500;
@@ -23,7 +23,7 @@ const pendingMessages = new Map<number, { resolve: Function; reject: Function }>
 
 function createExportWorker() {
   const worker = new Worker(
-    new URL("./ExportThread.ts", import.meta.url),
+    new URL("./export-thread.ts", import.meta.url),
     { type: "module" }
   );
   worker.onmessage = (e: MessageEvent) => {

@@ -1,10 +1,9 @@
-import AddIcon from "@mui/icons-material/Add";
-import { Box, Button } from "@mui/material";
+import { Plus } from "lucide-react";
 import { observer } from "mobx-react";
 import { useEffect, useRef, useState } from "react";
-import CameraManager from "../services/CameraManager";
-import ShaderManager from "../services/ShaderManager";
-import TextureList from "./TextureList";
+import CameraManager from "../services/camera-manager";
+import ShaderManager from "../services/shader-manager";
+import TextureList from "./texture-list";
 
 type Props = {
   index: number;
@@ -56,49 +55,27 @@ function ImageInputButton({ index }: Props) {
   }, [texture?.image]);
 
   return (
-    <Box
-      component="div"
-      sx={{
-        width: 50,
-        height: 50,
-        borderRadius: 1,
-        overflow: "hidden",
-        position: "relative",
-        mt: 1,
-        mb: 1,
-      }}
-    >
+    <div className="w-[50px] h-[50px] rounded overflow-hidden relative my-1">
       {texture && !open && (
         <canvas
           ref={canvasRef}
           width={50}
           height={50}
-          style={{ position: "absolute", top: 0 }}
+          className="absolute top-0"
         />
       )}
-      <Button
-        size="large"
+      <button
         onClick={handleClickOpen}
-        sx={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 50,
-          height: 50,
-          color: "white",
-          backgroundColor: "rgba(0,0,0,0.2)",
-          "&:hover": {
-            backgroundColor: "rgba(0,0,0,0.1)",
-          },
-        }}
-        startIcon={<AddIcon sx={{ fontSize: 50 }} />}
-      ></Button>
+        className="absolute top-0 left-0 w-[50px] h-[50px] text-white bg-black/20 hover:bg-black/10 flex items-center justify-center cursor-pointer"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
       <TextureList
         open={open}
         onClose={handleClose}
         onTextureSelect={handleTextureSelect}
       />
-    </Box>
+    </div>
   );
 }
 

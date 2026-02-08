@@ -8,63 +8,60 @@ Only single-pass shaders are currently supported. Tested on Chrome for Android a
 
 ## Tech Stack
 
-- **Language:** TypeScript 4.4 (strict mode)
-- **Framework:** React 17 with functional components and hooks
-- **Build:** Create React App + Craco (for webpack overrides)
-- **Package Manager:** Yarn
-- **UI:** Material-UI (MUI) 5 with Emotion CSS-in-JS
-- **3D/Shaders:** Three.js 0.136 via React Three Fiber 7 and @react-three/drei 8
+- **Language:** TypeScript 5.7 (strict mode)
+- **Framework:** React 19 with functional components and hooks
+- **Build:** Vite 6 with `@vitejs/plugin-react`
+- **Package Manager:** npm
+- **UI:** shadcn/ui (Radix UI primitives + Tailwind CSS), lucide-react icons, react-hot-toast
+- **3D/Shaders:** Three.js 0.173 via React Three Fiber 9 and @react-three/drei 10
 - **State Management:** MobX 6 with `mobx-persist-store` + `localforage` (IndexedDB)
-- **Workers:** `threads` library for Web Worker PNG export
-- **Testing:** Jest + React Testing Library
-- **Linting:** ESLint (react-app preset, configured in package.json)
-- **PWA:** Service Worker via `react-scripts`
+- **Testing:** Vitest + React Testing Library
+- **PWA:** Service Worker via Vite
 
 ## Commands
 
 ```bash
-yarn start      # Dev server (HTTPS enabled on Windows via set HTTPS=true)
-yarn build      # Production build
-yarn test       # Run tests (Jest, interactive watch mode)
+npm run dev     # Dev server
+npm run build   # Production build (tsc -b && vite build)
+npm test        # Run tests (vitest)
 ```
-
-All scripts use `craco` instead of `react-scripts` directly, to apply webpack overrides defined in `craco.config.js`.
 
 ## Project Structure
 
 ```
 src/
 ├── index.tsx                    # React entry point
-├── App.tsx                      # Root component, initializes services
+├── app.tsx                      # Root component, initializes services
 ├── types.ts                     # Shared TypeScript types (Shader, Pass, Parameter, etc.)
 ├── three.js                     # Custom Three.js tree-shaken re-exports (reduces bundle size)
+├── lib/
+│   └── utils.ts                 # Tailwind cn() merge utility
 ├── components/
-│   ├── Camera.tsx               # Main camera UI (layout, buttons, menus)
-│   ├── GLView.tsx               # React Three Fiber scene with shader rendering
-│   ├── ShaderList.tsx           # Shader selection dialog (fetches from Shadertoy API)
-│   ├── Parameters.tsx           # Bottom drawer for shader parameter sliders
-│   ├── ParameterSlider.tsx      # Individual parameter slider control
-│   ├── ImagePreview.tsx         # Full-screen photo preview with pinch-zoom
-│   ├── VideoPreview.tsx         # Video playback preview
-│   ├── ImageInputButton.tsx     # Button for adding image inputs
-│   ├── TextureList.tsx          # Input texture selector (camera or images)
-│   ├── ItemMenu.tsx             # Reusable context menu
-│   └── renderer/
-│       └── GLView.tsx           # React Three Fiber Canvas wrapper
+│   ├── ui/                      # shadcn/ui primitives (button, dialog, dropdown-menu, slider, drawer, input)
+│   ├── camera.tsx               # Main camera UI (layout, buttons, menus)
+│   ├── gl-view.tsx              # React Three Fiber Canvas wrapper + shader quad
+│   ├── shader-list.tsx          # Shader selection dialog (fetches from Shadertoy API)
+│   ├── parameters.tsx           # Bottom drawer for shader parameter sliders
+│   ├── parameter-slider.tsx     # Individual parameter slider control
+│   ├── image-preview.tsx        # Full-screen photo preview with pinch-zoom
+│   ├── video-preview.tsx        # Video playback preview
+│   ├── image-input-button.tsx   # Button for adding image inputs
+│   ├── texture-list.tsx         # Input texture selector (camera or images)
+│   └── item-menu.tsx            # Reusable dropdown context menu
 ├── services/
-│   ├── App.ts                   # Central state: pointer tracking, export settings, init
-│   ├── CameraManager.ts         # Camera streams, video texture, photo capture, tile-based export
-│   ├── ShaderManager.ts         # Fetch/parse Shadertoy shaders, parameter extraction
-│   ├── TextureManager.ts        # Manage/persist input textures via IndexedDB
-│   ├── ShadertoyMaterial.ts     # Three.js ShaderMaterial converting Shadertoy GLSL to Three.js
-│   ├── ExportThread.ts          # Web Worker thread for PNG encoding
+│   ├── app.ts                   # Central state: pointer tracking, export settings, init
+│   ├── camera-manager.ts        # Camera streams, video texture, photo capture, tile-based export
+│   ├── shader-manager.ts        # Fetch/parse Shadertoy shaders, parameter extraction
+│   ├── texture-manager.ts       # Manage/persist input textures via IndexedDB
+│   ├── shadertoy-material.ts    # Three.js ShaderMaterial converting Shadertoy GLSL to Three.js
+│   ├── export-thread.ts         # Web Worker thread for PNG encoding
 │   └── dekapng/                 # Custom tile-based PNG writer
 │       ├── png-writer.ts
 │       ├── chunks/              # PNG format chunks (IHDR, IEND, pre-header)
 │       └── util/                # CRC, Adler, Zlib, ArrayBuffer helpers
 ├── constants/
-│   └── testShaders.ts           # Built-in GLSL test shaders
-└── serviceWorkerRegistration.ts # PWA service worker setup
+│   └── test-shaders.ts          # Built-in GLSL test shaders
+└── index.css                    # Tailwind imports + global styles
 ```
 
 ## Architecture
@@ -89,11 +86,11 @@ Services are imported directly by components (no dependency injection or context
 
 | Service | Role |
 |---------|------|
-| `App` | Global state: pointer position, export size, FPS. Orchestrates `init()` for all services |
-| `CameraManager` | Camera stream lifecycle, video texture, photo capture, high-res tile-based export |
-| `ShaderManager` | Fetches shaders from Shadertoy REST API, parses GLSL for parameters |
-| `TextureManager` | Stores/retrieves texture URLs from IndexedDB |
-| `ShadertoyMaterial` | Converts Shadertoy GLSL to Three.js `ShaderMaterial`, manages uniforms (`iResolution`, `iTime`, `iMouse`, `iChannel0-3`) |
+| `app` | Global state: pointer position, export size, FPS. Orchestrates `init()` for all services |
+| `camera-manager` | Camera stream lifecycle, video texture, photo capture, high-res tile-based export |
+| `shader-manager` | Fetches shaders from Shadertoy REST API, parses GLSL for parameters |
+| `texture-manager` | Stores/retrieves texture URLs from IndexedDB |
+| `shadertoy-material` | Converts Shadertoy GLSL to Three.js `ShaderMaterial`, manages uniforms (`iResolution`, `iTime`, `iMouse`, `iChannel0-3`) |
 
 ### Rendering Pipeline
 
@@ -104,7 +101,7 @@ Services are imported directly by components (no dependency injection or context
 
 ### Three.js Tree Shaking
 
-`src/three.js` provides a custom subset of Three.js exports to reduce bundle size. Webpack is configured in `craco.config.js` to alias `three` → `./src/three.js`. Only add exports here that are actually used.
+`src/three.js` provides a custom subset of Three.js exports to reduce bundle size. Vite is configured in `vite.config.ts` to alias `three` → `./src/three.js`. Only add exports here that are actually used.
 
 ## Key Types
 
@@ -119,15 +116,16 @@ Defined in `src/types.ts`:
 
 ### Code Style
 
-- **Components:** PascalCase filenames (`.tsx`), functional components with hooks, wrapped in MobX `observer()` at export
-- **Services:** PascalCase filenames (`.ts`), class-based singletons with `makeAutoObservable`
-- **Utilities:** camelCase filenames
+- **Filenames:** kebab-case for all files (`.tsx`, `.ts`)
+- **Components:** Functional components with hooks, wrapped in MobX `observer()` at export
+- **Services:** Class-based singletons with `makeAutoObservable`
 - **No Prettier config** — follow existing formatting (2-space indent, double quotes for imports)
 
 ### Component Patterns
 
 - Components live in `src/components/`, business logic in `src/services/`
-- MUI components (`Box`, `Dialog`, `Drawer`, `IconButton`) used extensively for layout
+- UI primitives live in `src/components/ui/` (shadcn/ui pattern — Radix + Tailwind)
+- Styling via Tailwind utility classes; use `cn()` from `src/lib/utils.ts` for conditional classes
 - Absolute positioning used for camera overlay UI elements
 - `observer()` HOC from `mobx-react` wraps components that read MobX observables
 
@@ -143,9 +141,6 @@ Only globally defined `const float` variables with `min` and `max` annotations a
 
 ## Important Notes
 
-- The `start` script uses `set HTTPS=true` (Windows syntax). On Linux/macOS, use `HTTPS=true craco start` or set the env var separately
-- The Shadertoy API key is embedded in `ShaderManager.ts` — this is a public API key for fetching shader data
+- The Shadertoy API key is embedded in `shader-manager.ts` — this is a public API key for fetching shader data
 - The `dekapng` library is vendored in-tree (not an npm dependency) — it handles tile-based PNG assembly for high-resolution exports that exceed single WebGL render target limits
-- Web Workers are managed via the `threads` library with `threads-plugin` for webpack integration
 - TypeScript strict mode is enabled (`tsconfig.json`)
-- ESLint extends `react-app` and `react-app/jest` (configured in `package.json`, no separate config file)
