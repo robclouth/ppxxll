@@ -1,7 +1,8 @@
 import { X, Share, Download } from "lucide-react";
 import { observer } from "mobx-react";
 import { useCallback, useRef } from "react";
-import CameraManager from "../services/camera-manager";
+import ExportManager from "../services/export-manager";
+import RenderManager from "../services/render-manager";
 import QuickPinchZoom, { make3dTransformValue } from "react-quick-pinch-zoom";
 import { Dialog, DialogFullScreen } from "./ui/dialog";
 import { Button } from "./ui/button";
@@ -12,7 +13,7 @@ interface Props {
 }
 
 function ImagePreview({ open, onClose }: Props) {
-  const { latestPreviewUrl } = CameraManager;
+  const { latestPreviewUrl } = RenderManager;
   const imgRef = useRef<HTMLImageElement>(null);
 
   const onUpdate = useCallback(({ x, y, scale }: { x: number; y: number; scale: number }) => {
@@ -26,14 +27,14 @@ function ImagePreview({ open, onClose }: Props) {
 
   async function handleSharePress() {
     try {
-      await CameraManager.shareExport();
+      await ExportManager.shareExport();
     } catch (err) {
       console.log(err);
     }
   }
 
   async function handleDownloadPress() {
-    await CameraManager.downloadExport();
+    await ExportManager.downloadExport();
   }
 
   return (

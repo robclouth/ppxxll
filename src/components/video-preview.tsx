@@ -1,7 +1,7 @@
 import { X, Share, Download } from "lucide-react";
 import { observer } from "mobx-react";
 import { useMemo } from "react";
-import CameraManager from "../services/camera-manager";
+import ExportManager from "../services/export-manager";
 import { Dialog, DialogFullScreen } from "./ui/dialog";
 import { Button } from "./ui/button";
 
@@ -11,18 +11,18 @@ interface Props {
 }
 
 function VideoPreview({ open, onClose }: Props) {
-  const { latestVideoBlob } = CameraManager;
+  const { latestVideoBlob } = ExportManager;
 
   const videoUrl = useMemo(() => {
     return latestVideoBlob ? URL.createObjectURL(latestVideoBlob) : undefined;
   }, [latestVideoBlob]);
 
   function handleSharePress() {
-    CameraManager.shareVideo();
+    ExportManager.shareVideo();
   }
 
   function handleDownloadPress() {
-    CameraManager.downloadVideo();
+    ExportManager.downloadVideo();
   }
 
   return (

@@ -2,17 +2,12 @@ import localForage from "localforage";
 import { makeAutoObservable, runInAction } from "mobx";
 import { makePersistable } from "mobx-persist-store";
 import { Parameter, Shader } from "../types";
-import CameraManager from "./camera-manager";
+import RenderManager from "./render-manager";
 
 const supportedTypes = ["float"];
 
 const parameterPattern =
   /(const)?\s+(\w+)\s+(\w+)\s+=\s+(.*);\s+\/\/\s*@param\s+(min\s+(.*)),\s*(max\s+(.*))/g;
-
-const ctypeToType: { [ctype: string]: string } = {
-  webcam: "camera",
-  image: "image",
-};
 
 class ShaderManager {
   shaders: { [id: string]: Shader } = {};
@@ -68,13 +63,11 @@ class ShaderManager {
             ...this.extractParameters(pass.code),
             inputs: pass.inputs.map((input: any) => ({
               id: input.id.toString(),
-              type: "camera",
-              src: undefined,
+              type: "camera" as const,
             })),
-            outputs: pass.outputs.map((input: any) => ({
-              id: input.id.toString(),
-              type: "image",
-              src: input.src,
+            outputs: pass.outputs.map((output: any) => ({
+              id: output.id.toString(),
+              type: "camera" as const,
             })),
           })),
         };
@@ -94,7 +87,7 @@ class ShaderManager {
 
   setShader(shader: Shader) {
     this.activeShaderId = shader.id;
-    CameraManager.setShader(this.activeShader!);
+    RenderManager.setShader(this.activeShader!);
   }
 
   extractMetadata(code: string) {
