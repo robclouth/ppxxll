@@ -1,13 +1,11 @@
-import * as React from "react";
-import { styled } from "@mui/material/styles";
 import Box from "@mui/material/Box";
-import Grid from "@mui/material/Grid";
+import Grid from "@mui/material/Grid2";
 import Typography from "@mui/material/Typography";
 import Slider from "@mui/material/Slider";
 import Input from "@mui/material/Input";
 import { observer } from "mobx-react";
 import { Parameter } from "../types";
-import startCase from "lodash/startCase";
+import startCase from "lodash-es/startCase";
 import { useState } from "react";
 
 type Props = {
@@ -17,7 +15,7 @@ type Props = {
 function ParameterSlider({ parameter }: Props) {
   const [value, setValue] = useState(parameter.value.toString());
 
-  const handleSliderChange = (event: Event, newValue: number | number[]) => {
+  const handleSliderChange = (_event: Event, newValue: number | number[]) => {
     parameter.value = newValue as number;
     setValue(parameter.value.toString());
   };
@@ -44,7 +42,7 @@ function ParameterSlider({ parameter }: Props) {
         {startCase(parameter.name)}
       </Typography>
       <Grid container spacing={2} alignItems="center">
-        <Grid item xs>
+        <Grid size="grow">
           <Slider
             size="small"
             value={typeof parameter.value === "number" ? parameter.value : 0}
@@ -55,7 +53,7 @@ function ParameterSlider({ parameter }: Props) {
             step={0.001}
           />
         </Grid>
-        <Grid item>
+        <Grid>
           <Input
             value={value}
             size="small"

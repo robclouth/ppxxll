@@ -2,7 +2,6 @@ import AddIcon from "@mui/icons-material/Add";
 import { Box, Button } from "@mui/material";
 import { observer } from "mobx-react";
 import { useEffect, useRef, useState } from "react";
-import { InputType } from "zlib";
 import CameraManager from "../services/CameraManager";
 import ShaderManager from "../services/ShaderManager";
 import TextureList from "./TextureList";
@@ -34,7 +33,7 @@ function ImageInputButton({ index }: Props) {
     setOpen(false);
   }
 
-  async function handleTextureSelect(url: string | null, type: InputType) {
+  async function handleTextureSelect(url: string | null, type: string) {
     const input = ShaderManager.activeShader?.passes[0].inputs[index]!;
 
     if (url) {

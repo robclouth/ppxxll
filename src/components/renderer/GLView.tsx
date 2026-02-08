@@ -1,6 +1,6 @@
 import { Box } from "@mui/material";
-import { AdaptiveDpr } from "@react-three/drei/core/AdaptiveDpr";
-import { OrthographicCamera } from "@react-three/drei/core/OrthographicCamera";
+import { AdaptiveDpr } from "@react-three/drei";
+import { OrthographicCamera } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { observer } from "mobx-react";
 import { useEffect } from "react";
@@ -29,7 +29,7 @@ const ShaderQuad = observer(() => {
 
   return (
     <mesh material={material}>
-      <planeBufferGeometry args={[2, 2, 1, 1]} />
+      <planeGeometry args={[2, 2, 1, 1]} />
     </mesh>
   );
 });

@@ -124,12 +124,12 @@ class ShaderManager {
         continue;
       }
 
-      if (minValue === NaN) {
+      if (Number.isNaN(minValue)) {
         console.error(`Badly formatter min value: ${match[6]}`);
         continue;
       }
 
-      if (maxValue === NaN) {
+      if (Number.isNaN(maxValue)) {
         console.error(`Badly formatter max value: ${match[8]}`);
         continue;
       }

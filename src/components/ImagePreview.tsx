@@ -3,12 +3,16 @@ import ShareIcon from "@mui/icons-material/Share";
 import DownloadIcon from "@mui/icons-material/Download";
 
 import { Dialog, IconButton, Slide } from "@mui/material";
+import { TransitionProps } from "@mui/material/transitions";
 import { observer } from "mobx-react";
-import { forwardRef, useCallback, useRef } from "react";
+import React, { forwardRef, useCallback, useRef } from "react";
 import CameraManager from "../services/CameraManager";
 import QuickPinchZoom, { make3dTransformValue } from "react-quick-pinch-zoom";
 
-const Transition = forwardRef<any>(function Transition(props: any, ref: any) {
+const Transition = forwardRef(function Transition(
+  props: TransitionProps & { children: React.ReactElement },
+  ref: React.Ref<unknown>
+) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
@@ -19,9 +23,9 @@ interface Props {
 
 function ImagePreview({ open, onClose }: Props) {
   const { latestPreviewUrl } = CameraManager;
-  const imgRef = useRef<any>();
+  const imgRef = useRef<any>(null);
 
-  const onUpdate = useCallback(({ x, y, scale }) => {
+  const onUpdate = useCallback(({ x, y, scale }: { x: number; y: number; scale: number }) => {
     const { current: img } = imgRef;
 
     if (img) {
@@ -53,7 +57,7 @@ function ImagePreview({ open, onClose }: Props) {
       fullScreen
       open={open}
       onClose={handleClose}
-      TransitionComponent={Transition as any}
+      TransitionComponent={Transition}
     >
       {latestPreviewUrl && (
         <QuickPinchZoom onUpdate={onUpdate}>
@@ -73,7 +77,7 @@ function ImagePreview({ open, onClose }: Props) {
         edge="start"
         color="inherit"
         onClick={handleSharePress}
-        aria-label="close"
+        aria-label="share"
         sx={{ position: "absolute", m: 1, top: 0, right: 0 }}
       >
         <ShareIcon />
@@ -82,7 +86,7 @@ function ImagePreview({ open, onClose }: Props) {
         edge="start"
         color="inherit"
         onClick={handleDownloadPress}
-        aria-label="close"
+        aria-label="download"
         sx={{ position: "absolute", m: 1, bottom: 0, right: 0 }}
       >
         <DownloadIcon />

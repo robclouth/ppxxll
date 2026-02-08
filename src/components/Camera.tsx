@@ -9,7 +9,7 @@ import {
   CircularProgress,
   IconButton,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { FullScreen, useFullScreenHandle } from "react-full-screen";
 import CameraManager from "../services/CameraManager";
 import ShaderManager from "../services/ShaderManager";

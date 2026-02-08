@@ -1,12 +1,9 @@
-import { Viewport } from "@react-three/fiber";
-import { autorun, makeAutoObservable } from "mobx";
-import { spawn, Transfer, Worker } from "threads";
+import { makeAutoObservable } from "mobx";
 import {
   CanvasTexture,
-  Material,
   Mesh,
   OrthographicCamera,
-  PlaneBufferGeometry,
+  PlaneGeometry,
   Scene,
   Texture,
   TextureLoader,
@@ -17,8 +14,41 @@ import ShadertoyMaterial from "./ShadertoyMaterial";
 import { InputOutput, Shader } from "../types";
 import App from "./App";
 import ShaderManager from "./ShaderManager";
+import { autorun } from "mobx";
 
 const maxChunkSize = 500;
+
+let messageId = 0;
+const pendingMessages = new Map<number, { resolve: Function; reject: Function }>();
+
+function createExportWorker() {
+  const worker = new Worker(
+    new URL("./ExportThread.ts", import.meta.url),
+    { type: "module" }
+  );
+  worker.onmessage = (e: MessageEvent) => {
+    const { id, result, error } = e.data;
+    const pending = pendingMessages.get(id);
+    if (pending) {
+      pendingMessages.delete(id);
+      if (error) pending.reject(new Error(error));
+      else pending.resolve(result);
+    }
+  };
+  return worker;
+}
+
+function callWorker(worker: Worker, type: string, args: any, transfer?: Transferable[]): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const id = messageId++;
+    pendingMessages.set(id, { resolve, reject });
+    if (transfer) {
+      worker.postMessage({ type, id, args }, transfer);
+    } else {
+      worker.postMessage({ type, id, args });
+    }
+  });
+}
 
 class CameraManager {
   material: ShadertoyMaterial;
@@ -27,7 +57,6 @@ class CameraManager {
   isRecording = false;
   isExporting = false;
   photoProgress = 0;
-  viewport!: Viewport;
 
   mode: "photo" | "video" = "photo";
   mediaStream?: MediaStream;
@@ -208,8 +237,8 @@ class CameraManager {
     this.isRenderingActive = active;
 
     if (this.cameraTexture?.image) {
-      if (active) this.cameraTexture.image.play();
-      else this.cameraTexture.image.pause();
+      if (active) (this.cameraTexture.image as HTMLVideoElement).play();
+      else (this.cameraTexture.image as HTMLVideoElement).pause();
     }
 
     if (this.material) {
@@ -330,7 +359,7 @@ class CameraManager {
 
     const exportSize = { ...App.exportSize };
 
-    this.cameraTexture?.image.pause();
+    (this.cameraTexture?.image as HTMLVideoElement)?.pause();
 
     const shaderInputTextures = [...this.inputTextures];
 
@@ -344,10 +373,8 @@ class CameraManager {
       });
     }
 
-    const { start, addRowChunks, finish } = await spawn(
-      new Worker("./ExportThread")
-    );
-    await start(exportSize.width, exportSize.height);
+    const worker = createExportWorker();
+    await callWorker(worker, "start", { width: exportSize.width, height: exportSize.height });
 
     this.material.setSize(exportSize.width, exportSize.height);
     this.material.updateInputTextures(shaderInputTextures);
@@ -355,7 +382,7 @@ class CameraManager {
     const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
     camera.position.z = 1;
     const scene = new Scene();
-    const quad = new Mesh(new PlaneBufferGeometry(2, 2, 1, 1), this.material);
+    const quad = new Mesh(new PlaneGeometry(2, 2, 1, 1), this.material);
     scene.add(quad);
 
     const renderer = new WebGLRenderer({ alpha: true });
@@ -409,20 +436,25 @@ class CameraManager {
         console.log(this.photoProgress);
       }
 
-      await addRowChunks(
-        Transfer(
-          rowChunks.map((chunk) => chunk.chunkBuffer),
-          rowChunks.map((chunk) => chunk.chunkBuffer)
-        ),
-        rowChunks.map((chunk) => chunk.chunkWidth),
-        chunkHeight
+      const buffers = rowChunks.map((chunk) => chunk.chunkBuffer);
+      await callWorker(
+        worker,
+        "addRowChunks",
+        {
+          buffers,
+          widths: rowChunks.map((chunk) => chunk.chunkWidth),
+          height: chunkHeight,
+        },
+        buffers
       );
     }
 
     renderer.dispose();
 
-    const imageBuffer = await finish();
+    const imageBuffer = await callWorker(worker, "finish", {});
     this.latestExportBlob = new Blob([imageBuffer]);
+
+    worker.terminate();
 
     this.material.setSize(this.canvas!.width, this.canvas!.height);
     this.material.updateInputTextures(this.inputTextures);
@@ -454,7 +486,7 @@ class CameraManager {
         files,
       };
       navigator.share(shareData);
-    } else throw "Share not available";
+    } else throw new Error("Share not available");
   }
 
   async downloadExport() {
@@ -476,9 +508,9 @@ class CameraManager {
   downloadFile(url: string, extension: string) {
     const filename = `${new Date().getTime()}.${extension}`;
 
-    const a = document.createElement<any>("a");
+    const a = document.createElement("a");
     document.body.appendChild(a);
-    a.style = "display: none";
+    (a as any).style = "display: none";
     a.href = url;
     a.download = filename;
     a.click();
