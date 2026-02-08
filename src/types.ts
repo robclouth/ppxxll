@@ -8,11 +8,10 @@ export type Parameter = {
   value: number;
 };
 
-export type InputType = "camera" | "image";
+export type InputType = "camera" | "captured";
 
 export type InputOutput = {
   id?: string;
-  url?: string;
   type: InputType;
 };
 
