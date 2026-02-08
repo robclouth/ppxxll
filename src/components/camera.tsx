@@ -1,13 +1,10 @@
 import {
-  Maximize,
-  Minimize,
   ChevronDown,
   Camera as CameraIcon,
   SwitchCamera,
   Crop,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { FullScreen, useFullScreenHandle } from "react-full-screen";
 import CameraManager from "../services/camera-manager";
 import ShaderManager from "../services/shader-manager";
 import App from "../services/app";
@@ -81,7 +78,6 @@ function useContainerSize(ref: React.RefObject<HTMLDivElement | null>) {
 }
 
 function Camera() {
-  const handle = useFullScreenHandle();
   const { activeShader } = ShaderManager;
 
   const [shaderListOpen, setShaderListOpen] = useState(false);
@@ -165,130 +161,116 @@ function Camera() {
   }
 
   return (
-    <FullScreen handle={handle} className="fullscreen">
-      <div className="w-full h-full flex flex-col bg-black overflow-hidden">
-        {/* Top bar */}
-        <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 z-10">
-          <Button
-            variant="default"
-            className="max-w-[50%] truncate"
-            onClick={handleShaderListPress}
+    <div className="w-full h-full flex flex-col bg-black overflow-hidden">
+      {/* Preview area - GLView contained with aspect ratio */}
+      <div
+        ref={previewContainerRef}
+        className="flex-1 flex items-center justify-center overflow-hidden relative min-h-0"
+      >
+        {previewSize.width > 0 && (
+          <div
+            className="relative"
+            style={{
+              width: previewSize.width,
+              height: previewSize.height,
+            }}
           >
-            {ShaderManager.activeShader?.title || "None"}
-            <ChevronDown className="h-4 w-4 ml-1 flex-shrink-0" />
-          </Button>
-          <div className="flex items-center gap-1">
-            {/* Aspect ratio selector */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="default" size="sm" className="text-xs gap-1">
-                  <Crop className="h-3.5 w-3.5" />
-                  {aspectRatio.label}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {ASPECT_RATIOS.map((ar) => (
-                  <DropdownMenuItem
-                    key={ar.label}
-                    className={cn(
-                      ar.label === aspectRatio.label && "bg-white/10"
-                    )}
-                    onSelect={() => setAspectRatio(ar)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="border border-white/50 rounded-sm"
-                        style={{
-                          width: ar.w > ar.h ? 18 : Math.round((18 * ar.w) / ar.h),
-                          height: ar.h > ar.w ? 18 : Math.round((18 * ar.h) / ar.w),
-                        }}
-                      />
-                      {ar.label}
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              variant="default"
-              size="icon"
-              onClick={handle.active ? handle.exit : handle.enter}
-            >
-              {handle.active ? (
-                <Minimize className="h-4 w-4" />
-              ) : (
-                <Maximize className="h-4 w-4" />
-              )}
-            </Button>
+            <GLView />
+            <Progress />
           </div>
-        </div>
-
-        {/* Preview area - GLView contained with aspect ratio */}
-        <div
-          ref={previewContainerRef}
-          className="flex-1 flex items-center justify-center overflow-hidden relative min-h-0"
-        >
-          {previewSize.width > 0 && (
-            <div
-              className="relative"
-              style={{
-                width: previewSize.width,
-                height: previewSize.height,
-              }}
-            >
-              <GLView />
-              <Progress />
+        )}
+        {/* Image input buttons */}
+        {activeShader?.passes[0].inputs &&
+          activeShader.passes[0].inputs.length > 0 && (
+            <div className="absolute left-2 top-1/2 -translate-y-1/2 flex flex-col">
+              {activeShader.passes[0].inputs.map((_input, i) => (
+                <ImageInputButton key={i} index={i} />
+              ))}
             </div>
           )}
-          {/* Image input buttons */}
-          {activeShader?.passes[0].inputs &&
-            activeShader.passes[0].inputs.length > 0 && (
-              <div className="absolute left-2 top-1/2 -translate-y-1/2 flex flex-col">
-                {activeShader.passes[0].inputs.map((_input, i) => (
-                  <ImageInputButton key={i} index={i} />
-                ))}
-              </div>
-            )}
-        </div>
+      </div>
 
-        {/* Parameters - always visible */}
-        <div className="flex-shrink-0">
-          <Parameters />
-        </div>
+      {/* Parameters - always visible */}
+      <div className="flex-shrink-0">
+        <Parameters />
+      </div>
 
-        {/* Bottom action buttons */}
-        <div className="flex-shrink-0 flex items-center justify-between px-6 py-3">
+      {/* Bottom controls */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3">
+        {/* Shader selector - bottom left */}
+        <Button
+          variant="ghost"
+          className="max-w-[40%] truncate text-sm px-2"
+          onClick={handleShaderListPress}
+        >
+          {ShaderManager.activeShader?.title || "None"}
+          <ChevronDown className="h-4 w-4 ml-1 flex-shrink-0" />
+        </Button>
+
+        {/* Camera controls - center */}
+        <div className="flex items-center gap-3">
           <Button
-            variant="default"
+            variant="ghost"
             size="icon"
-            className="h-11 w-11 rounded-full"
+            className="h-10 w-10 rounded-full"
             onClick={handleSwitchCameraPress}
           >
             <SwitchCamera className="h-5 w-5" />
           </Button>
           <Button
-            variant="default"
+            variant="ghost"
             size="icon"
             className="h-14 w-14 rounded-full border-2 border-white/30"
             onClick={handleTakePicturePress}
           >
             <CameraIcon className="h-6 w-6" />
           </Button>
-          <div className="w-11" />
         </div>
 
-        {/* Dialogs */}
-        <ShaderList open={shaderListOpen} onClose={handleShaderListClose} />
-        <ImagePreview
-          open={photoPreviewOpen}
-          onClose={handlePhotoPreviewClose}
-        />
-        <VideoPreview
-          open={videoPreviewOpen}
-          onClose={handleVideoPreviewClose}
-        />
+        {/* Aspect ratio - bottom right */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="text-sm px-2 gap-1">
+              <Crop className="h-4 w-4" />
+              {aspectRatio.label}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="top">
+            {ASPECT_RATIOS.map((ar) => (
+              <DropdownMenuItem
+                key={ar.label}
+                className={cn(
+                  ar.label === aspectRatio.label && "bg-white/10"
+                )}
+                onSelect={() => setAspectRatio(ar)}
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className="border border-white/50 rounded-sm"
+                    style={{
+                      width: ar.w > ar.h ? 18 : Math.round((18 * ar.w) / ar.h),
+                      height: ar.h > ar.w ? 18 : Math.round((18 * ar.h) / ar.w),
+                    }}
+                  />
+                  {ar.label}
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-    </FullScreen>
+
+      {/* Dialogs */}
+      <ShaderList open={shaderListOpen} onClose={handleShaderListClose} />
+      <ImagePreview
+        open={photoPreviewOpen}
+        onClose={handlePhotoPreviewClose}
+      />
+      <VideoPreview
+        open={videoPreviewOpen}
+        onClose={handleVideoPreviewClose}
+      />
+    </div>
   );
 }
 
