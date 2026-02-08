@@ -195,9 +195,28 @@ function Camera() {
         <Parameters />
       </div>
 
-      {/* Bottom controls */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3">
-        {/* Shader selector - bottom left */}
+      {/* Camera controls row */}
+      <div className="flex-shrink-0 flex items-center justify-center gap-4 py-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 rounded-full"
+          onClick={handleSwitchCameraPress}
+        >
+          <SwitchCamera className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-14 w-14 rounded-full border-2 border-white/30"
+          onClick={handleTakePicturePress}
+        >
+          <CameraIcon className="h-6 w-6" />
+        </Button>
+      </div>
+
+      {/* Shader selector + aspect ratio row */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 pb-3">
         <Button
           variant="ghost"
           className="max-w-[40%] truncate text-sm px-2"
@@ -207,27 +226,6 @@ function Camera() {
           <ChevronDown className="h-4 w-4 ml-1 flex-shrink-0" />
         </Button>
 
-        {/* Camera controls - center */}
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 rounded-full"
-            onClick={handleSwitchCameraPress}
-          >
-            <SwitchCamera className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-14 w-14 rounded-full border-2 border-white/30"
-            onClick={handleTakePicturePress}
-          >
-            <CameraIcon className="h-6 w-6" />
-          </Button>
-        </div>
-
-        {/* Aspect ratio - bottom right */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="text-sm px-2 gap-1">
