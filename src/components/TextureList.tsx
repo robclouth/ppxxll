@@ -6,9 +6,7 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   DialogTitle,
-  Drawer,
   IconButton,
   ImageList,
   ImageListItem,
@@ -17,8 +15,9 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
+import { TransitionProps } from "@mui/material/transitions";
 import { observer } from "mobx-react";
-import { forwardRef, useEffect, useRef, useState } from "react";
+import React, { forwardRef, useEffect, useRef, useState } from "react";
 
 import AddIcon from "@mui/icons-material/Add";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
@@ -26,7 +25,10 @@ import CameraManager from "../services/CameraManager";
 import TextureManager from "../services/TextureManager";
 import ItemMenu from "./ItemMenu";
 
-const Transition = forwardRef<any>(function Transition(props: any, ref: any) {
+const Transition = forwardRef(function Transition(
+  props: TransitionProps & { children: React.ReactElement },
+  ref: React.Ref<unknown>
+) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
@@ -109,7 +111,7 @@ function TextureList({ open, onClose, onTextureSelect }: Props) {
       fullScreen
       open={open}
       onClose={handleClose}
-      TransitionComponent={Transition as any}
+      TransitionComponent={Transition}
       keepMounted
     >
       <AppBar sx={{ position: "relative" }}>
@@ -153,7 +155,7 @@ function TextureList({ open, onClose, onTextureSelect }: Props) {
               </ImageListItem>
             </ButtonBase>
           )}
-          {textures.map((url, i) => (
+          {textures.map((url) => (
             <ImageListItem key={url} style={{ width: "100%", height: "100%" }}>
               <ButtonBase
                 key={url}

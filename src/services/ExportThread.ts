@@ -1,4 +1,3 @@
-import { expose } from "threads/worker";
 import PNGWriter from "./dekapng/png-writer";
 
 let pngWriter: PNGWriter | undefined;
@@ -24,10 +23,30 @@ function addRowChunks(
   }
 }
 
-async function finish() {
+async function finish(): Promise<ArrayBuffer> {
   if (!pngWriter) throw new Error("start() not called");
   const blob = pngWriter.finishAndGetBlob();
   return await blob.arrayBuffer();
 }
 
-expose({ start, addRowChunks, finish });
+self.onmessage = async (e: MessageEvent) => {
+  const { type, id, args } = e.data;
+
+  try {
+    let result: any;
+    if (type === "start") {
+      start(args.width, args.height);
+      result = undefined;
+    } else if (type === "addRowChunks") {
+      addRowChunks(args.buffers, args.widths, args.height);
+      result = undefined;
+    } else if (type === "finish") {
+      result = await finish();
+      self.postMessage({ id, result }, { transfer: [result] } as any);
+      return;
+    }
+    self.postMessage({ id, result });
+  } catch (error: any) {
+    self.postMessage({ id, error: error.message });
+  }
+};

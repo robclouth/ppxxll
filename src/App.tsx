@@ -1,5 +1,5 @@
 import { Box, createTheme, ThemeProvider } from "@mui/material";
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import "./App.css";
 import Camera from "./components/Camera";
 import CssBaseline from "@mui/material/CssBaseline";

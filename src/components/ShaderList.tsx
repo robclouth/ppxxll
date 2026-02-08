@@ -19,13 +19,17 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
+import { TransitionProps } from "@mui/material/transitions";
 import { observer } from "mobx-react";
-import { forwardRef, useState } from "react";
+import React, { forwardRef, useState } from "react";
 import ShaderManager from "../services/ShaderManager";
 import { Shader } from "../types";
 import ItemMenu from "./ItemMenu";
 
-const Transition = forwardRef<any>(function Transition(props: any, ref: any) {
+const Transition = forwardRef(function Transition(
+  props: TransitionProps & { children: React.ReactElement },
+  ref: React.Ref<unknown>
+) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
@@ -96,7 +100,7 @@ function ShaderList({ open, onClose }: Props) {
       fullScreen
       open={open}
       onClose={handleClose}
-      TransitionComponent={Transition as any}
+      TransitionComponent={Transition}
       keepMounted
     >
       <AppBar sx={{ position: "relative" }}>
