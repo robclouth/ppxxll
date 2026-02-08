@@ -1,41 +1,50 @@
 import { observer } from "mobx-react";
+import { useState, useEffect } from "react";
 import ShaderManager from "../services/shader-manager";
-import { Parameter } from "../types";
 import ParameterSlider from "./parameter-slider";
+import startCase from "lodash-es/startCase";
 import { cn } from "../lib/utils";
 
-interface Props {
-  open: boolean;
-  onClose: () => void;
-}
-
-function Parameters({ open, onClose }: Props) {
+function Parameters() {
   const { activeShader } = ShaderManager;
-
   const parameters = activeShader?.passes[0].parameters
     ? Object.values(activeShader?.passes[0].parameters)
     : [];
 
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [activeShader?.id]);
+
+  if (parameters.length === 0) return null;
+
+  const selectedParam = parameters[Math.min(selectedIndex, parameters.length - 1)];
+
   return (
-    <>
-      {open && (
-        <div className="fixed inset-0 z-40" onClick={onClose} />
-      )}
+    <div className="flex flex-col gap-2 py-2">
+      {/* Parameter name selector - horizontal scroll with snap */}
       <div
-        className={cn(
-          "fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out",
-          open ? "translate-y-0" : "translate-y-full"
-        )}
+        className="flex gap-1 overflow-x-auto px-4 snap-x snap-mandatory scrollbar-hide"
       >
-        <div className="flex flex-col items-stretch p-2 overflow-x-hidden overflow-y-auto max-h-[30vh] bg-black/50 backdrop-blur-sm">
-          {parameters.map((parameter) => (
-            <div key={parameter.name} className="flex flex-col items-stretch">
-              <ParameterSlider parameter={parameter} />
-            </div>
-          ))}
-        </div>
+        {parameters.map((param, i) => (
+          <button
+            key={param.name}
+            className={cn(
+              "flex-shrink-0 snap-center px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer",
+              i === selectedIndex
+                ? "text-white"
+                : "text-white/40 hover:text-white/60"
+            )}
+            onClick={() => setSelectedIndex(i)}
+          >
+            {startCase(param.name)}
+          </button>
+        ))}
       </div>
-    </>
+      {/* Active parameter dial slider */}
+      <ParameterSlider key={selectedParam.name} parameter={selectedParam} />
+    </div>
   );
 }
 
