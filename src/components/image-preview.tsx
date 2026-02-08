@@ -1,10 +1,16 @@
-import { X, Share, Download } from "lucide-react";
+import { Share, Download } from "lucide-react";
 import { observer } from "mobx-react";
 import ExportManager from "../services/export-manager";
 import RenderManager from "../services/render-manager";
 import App from "../services/app";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import { Dialog, DialogFullScreen } from "./ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from "./ui/drawer";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -68,19 +74,12 @@ function ImagePreview({ open, onClose }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogFullScreen className="bg-black">
-        {/* Close button */}
-        <div className="flex-shrink-0 flex items-center p-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            aria-label="close"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
+    <Drawer open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DrawerContent className="h-[92vh] max-h-[92vh]">
+        <DrawerHeader className="sr-only">
+          <DrawerTitle>Preview</DrawerTitle>
+          <DrawerDescription>Photo preview</DrawerDescription>
+        </DrawerHeader>
 
         {/* Pinch-zoomable preview - wrapper fills space, content centered */}
         <div className="flex-1 min-h-0">
@@ -104,8 +103,7 @@ function ImagePreview({ open, onClose }: Props) {
         </div>
 
         {/* Bottom controls */}
-        <div className="flex-shrink-0 p-4 space-y-3">
-          {/* Format + Resolution + actions row */}
+        <div className="flex-shrink-0 p-4">
           <div className="flex items-center gap-2">
             {/* Format selector */}
             <DropdownMenu>
@@ -175,8 +173,8 @@ function ImagePreview({ open, onClose }: Props) {
             </Button>
           </div>
         </div>
-      </DialogFullScreen>
-    </Dialog>
+      </DrawerContent>
+    </Drawer>
   );
 }
 
