@@ -52,12 +52,10 @@ function ImagePreview({ open, onClose }: Props) {
         height: preset.size,
       };
     }
-    ExportManager.latestExportBlob = undefined;
   }
 
   function handleFormatChange(format: "png" | "jpeg") {
     ExportManager.exportFormat = format;
-    ExportManager.latestExportBlob = undefined;
   }
 
   async function handleSharePress() {

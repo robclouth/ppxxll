@@ -125,7 +125,6 @@ function Camera() {
         height: baseSize,
       };
     }
-    ExportManager.latestExportBlob = undefined;
   }, [aspectRatio]);
 
   function handleShaderListClose() {

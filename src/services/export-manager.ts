@@ -236,7 +236,7 @@ class ExportManager {
   }
 
   async shareExport() {
-    if (!this.latestExportBlob) await this.exportImage();
+    await this.exportImage();
     const ext = this.exportFormat === "jpeg" ? "jpg" : "png";
     this.shareFile(this.latestExportBlob!, ext);
   }
@@ -265,7 +265,7 @@ class ExportManager {
   }
 
   async downloadExport() {
-    if (!this.latestExportBlob) await this.exportImage();
+    await this.exportImage();
 
     const ext = this.exportFormat === "jpeg" ? "jpg" : "png";
     const url = URL.createObjectURL(this.latestExportBlob!);
