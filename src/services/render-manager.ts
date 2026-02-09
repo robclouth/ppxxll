@@ -52,8 +52,14 @@ class RenderManager {
     this.isRenderingActive = active;
 
     if (CameraManager.cameraTexture?.image) {
-      if (active) (CameraManager.cameraTexture.image as HTMLVideoElement).play();
-      else (CameraManager.cameraTexture.image as HTMLVideoElement).pause();
+      const video = CameraManager.cameraTexture.image as HTMLVideoElement;
+      if (active) {
+        video.play().catch((err) => {
+          console.warn("Could not resume camera playback:", err);
+        });
+      } else {
+        video.pause();
+      }
     }
 
     if (this.material) {

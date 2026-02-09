@@ -8,6 +8,7 @@ import { InputOutput } from "../types";
 import ShaderManager from "./shader-manager";
 
 const PREVIEW_MAX_DIM = 1200;
+const LOAD_TIMEOUT_MS = 10000;
 
 function downsizeToCanvas(
   source: HTMLCanvasElement,
@@ -57,6 +58,18 @@ class CameraManager {
   async init() {
     await this.detectCameras();
     await this.startVideoStream();
+
+    // On mobile browsers the OS can revoke camera access when the tab is
+    // backgrounded.  Re-acquire the stream when the user returns.
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && this.mediaStream) {
+        const track = this.mediaStream.getVideoTracks()[0];
+        if (!track || track.readyState === "ended") {
+          console.warn("Camera track lost while hidden, restarting stream");
+          this.startVideoStream();
+        }
+      }
+    });
   }
 
   async detectCameras() {
@@ -92,10 +105,7 @@ class CameraManager {
 
   async startVideoStream(preview = true) {
     try {
-      if (this.mediaStream) {
-        this.mediaStream.getTracks().forEach((track) => track.stop());
-      }
-      if (this.cameraTexture) this.cameraTexture.dispose();
+      this.stopCurrentStream();
 
       const constraints = {
         audio: false,
@@ -116,20 +126,33 @@ class CameraManager {
       const { width, height } = mediaStreamTrack.getSettings();
       console.log(`Stream res: ${width}:${height}`);
 
+      // Restart the stream if the track ends unexpectedly (e.g. tab
+      // backgrounded on mobile, OS-level camera revocation, device
+      // disconnect).
+      mediaStreamTrack.addEventListener("ended", () => {
+        console.warn("Camera track ended unexpectedly, restarting stream");
+        this.startVideoStream(preview);
+      }, { once: true });
+
       const video = document.createElement("video");
       video.srcObject = this.mediaStream;
       video.width = width!;
       video.height = height!;
 
       await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Timed out waiting for camera video data"));
+        }, LOAD_TIMEOUT_MS);
+
         video.addEventListener("loadeddata", async () => {
+          clearTimeout(timeout);
           try {
             await video.play();
             resolve();
           } catch (error) {
             reject(error);
           }
-        });
+        }, { once: true });
       });
 
       this.cameraTexture = new VideoTexture(video);
@@ -138,9 +161,16 @@ class CameraManager {
     }
   }
 
-  switchCamera() {
+  private stopCurrentStream() {
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach((track) => track.stop());
+    }
+    if (this.cameraTexture) this.cameraTexture.dispose();
+  }
+
+  async switchCamera() {
     this.activeCamera = this.activeCamera === "front" ? "back" : "front";
-    this.startVideoStream();
+    await this.startVideoStream();
   }
 
   /** Capture a high-res photo from the camera and return it as a canvas */
@@ -178,7 +208,12 @@ class CameraManager {
     const ctx = canvas.getContext("2d")!;
 
     await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Timed out waiting for high-res camera data"));
+      }, LOAD_TIMEOUT_MS);
+
       video.addEventListener("loadeddata", async () => {
+        clearTimeout(timeout);
         const { videoWidth, videoHeight } = video;
         canvas.width = videoWidth;
         canvas.height = videoHeight;
@@ -189,7 +224,7 @@ class CameraManager {
         } catch (error) {
           reject(error);
         }
-      });
+      }, { once: true });
     });
 
     stream.getTracks().forEach((track) => track.stop());
