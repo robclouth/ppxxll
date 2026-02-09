@@ -1,11 +1,31 @@
 import { X, Share, Download } from "lucide-react";
 import { observer } from "mobx-react";
-import { useCallback, useRef } from "react";
 import ExportManager from "../services/export-manager";
 import RenderManager from "../services/render-manager";
-import QuickPinchZoom, { make3dTransformValue } from "react-quick-pinch-zoom";
-import { Dialog, DialogFullScreen } from "./ui/dialog";
+import App from "../services/app";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerDescription,
+} from "./ui/drawer";
 import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "./ui/dropdown-menu";
+import { cn } from "../lib/utils";
+
+const RESOLUTION_PRESETS = [
+  { label: "1080p", size: 1920 },
+  { label: "2K", size: 2560 },
+  { label: "4K", size: 3840 },
+  { label: "6K", size: 5760 },
+  { label: "8K", size: 7680 },
+];
 
 interface Props {
   open: boolean;
@@ -14,16 +34,29 @@ interface Props {
 
 function ImagePreview({ open, onClose }: Props) {
   const { latestPreviewUrl } = RenderManager;
-  const imgRef = useRef<HTMLImageElement>(null);
 
-  const onUpdate = useCallback(({ x, y, scale }: { x: number; y: number; scale: number }) => {
-    const { current: img } = imgRef;
+  const currentResolution = RESOLUTION_PRESETS.find(
+    (r) => r.size === Math.max(App.exportSize.width, App.exportSize.height)
+  ) || RESOLUTION_PRESETS[2];
 
-    if (img) {
-      const value = make3dTransformValue({ x, y, scale });
-      img.style.setProperty("transform", value);
+  function handleResolutionChange(preset: typeof RESOLUTION_PRESETS[number]) {
+    const ratio = App.exportSize.width / App.exportSize.height;
+    if (ratio >= 1) {
+      App.exportSize = {
+        width: preset.size,
+        height: Math.round(preset.size / ratio),
+      };
+    } else {
+      App.exportSize = {
+        width: Math.round(preset.size * ratio),
+        height: preset.size,
+      };
     }
-  }, []);
+  }
+
+  function handleFormatChange(format: "png" | "jpeg") {
+    ExportManager.exportFormat = format;
+  }
 
   async function handleSharePress() {
     try {
@@ -38,42 +71,115 @@ function ImagePreview({ open, onClose }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogFullScreen className="bg-black">
-        {latestPreviewUrl && (
-          <QuickPinchZoom onUpdate={onUpdate}>
-            <img ref={imgRef} src={latestPreviewUrl} />
-          </QuickPinchZoom>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-0 left-0 m-2"
-          onClick={onClose}
-          aria-label="close"
-        >
-          <X className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-0 right-0 m-2"
-          onClick={handleSharePress}
-          aria-label="share"
-        >
-          <Share className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute bottom-0 right-0 m-2"
-          onClick={handleDownloadPress}
-          aria-label="download"
-        >
-          <Download className="h-5 w-5" />
-        </Button>
-      </DialogFullScreen>
-    </Dialog>
+    <Drawer open={open} onOpenChange={(isOpen) => !isOpen && onClose()} dismissible={false}>
+      <DrawerContent className="h-[92vh] max-h-[92vh] [&>div:first-child]:hidden">
+        <div className="flex-shrink-0 flex items-center justify-between px-4 pt-3 pb-1">
+          <DrawerTitle>Preview</DrawerTitle>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="close"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+        <DrawerDescription className="sr-only">Photo preview</DrawerDescription>
+
+        {/* Pinch-zoomable preview - wrapper fills space, content centered */}
+        <div className="flex-1 min-h-0">
+          {latestPreviewUrl && (
+            <TransformWrapper
+              centerOnInit
+              minScale={0.5}
+              maxScale={10}
+            >
+              <TransformComponent
+                wrapperStyle={{ width: "100%", height: "100%" }}
+                contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <img
+                  src={latestPreviewUrl}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </TransformComponent>
+            </TransformWrapper>
+          )}
+        </div>
+
+        {/* Bottom controls */}
+        <div className="flex-shrink-0 p-4">
+          <div className="flex items-center gap-2">
+            {/* Format selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="text-sm">
+                  {ExportManager.exportFormat.toUpperCase()}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top">
+                <DropdownMenuItem
+                  className={cn(ExportManager.exportFormat === "png" && "bg-white/10")}
+                  onSelect={() => handleFormatChange("png")}
+                >
+                  PNG
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className={cn(ExportManager.exportFormat === "jpeg" && "bg-white/10")}
+                  onSelect={() => handleFormatChange("jpeg")}
+                >
+                  JPEG
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Resolution selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="text-sm">
+                  {currentResolution.label}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top">
+                {RESOLUTION_PRESETS.map((preset) => (
+                  <DropdownMenuItem
+                    key={preset.label}
+                    className={cn(
+                      currentResolution.label === preset.label && "bg-white/10"
+                    )}
+                    onSelect={() => handleResolutionChange(preset)}
+                  >
+                    {preset.label} ({preset.size}px)
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="flex-1" />
+
+            {/* Share + Download buttons */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleSharePress}
+            >
+              <Share className="h-4 w-4" />
+              Share
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleDownloadPress}
+            >
+              <Download className="h-4 w-4" />
+              Save
+            </Button>
+          </div>
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

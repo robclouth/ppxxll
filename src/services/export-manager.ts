@@ -54,6 +54,7 @@ class ExportManager {
   photoProgress = 0;
 
   latestExportBlob?: Blob;
+  exportFormat: "png" | "jpeg" = "png";
 
   mode: "photo" | "video" = "photo";
   isRecording = false;
@@ -79,11 +80,25 @@ class ExportManager {
     material.setSize(exportSize.width, exportSize.height);
     material.updateInputTextures(exportTextures);
 
-    const worker = createExportWorker();
-    await callWorker(worker, "start", {
-      width: exportSize.width,
-      height: exportSize.height,
-    });
+    const isJpeg = this.exportFormat === "jpeg";
+
+    // For JPEG we assemble tiles onto a canvas; for PNG we use the worker
+    let worker: Worker | undefined;
+    let jpegCanvas: HTMLCanvasElement | undefined;
+    let jpegCtx: CanvasRenderingContext2D | undefined;
+
+    if (isJpeg) {
+      jpegCanvas = document.createElement("canvas");
+      jpegCanvas.width = exportSize.width;
+      jpegCanvas.height = exportSize.height;
+      jpegCtx = jpegCanvas.getContext("2d")!;
+    } else {
+      worker = createExportWorker();
+      await callWorker(worker, "start", {
+        width: exportSize.width,
+        height: exportSize.height,
+      });
+    }
 
     const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
     camera.position.z = 1;
@@ -133,30 +148,56 @@ class ExportManager {
           uintArray
         );
 
-        rowChunks.push({ chunkBuffer, chunkWidth, chunkHeight });
+        if (isJpeg && jpegCtx) {
+          // WebGL pixels are bottom-to-top, flip vertically when drawing to canvas
+          const imageData = new ImageData(chunkWidth, chunkHeight);
+          for (let row = 0; row < chunkHeight; row++) {
+            const srcOffset = (chunkHeight - 1 - row) * chunkWidth * 4;
+            const dstOffset = row * chunkWidth * 4;
+            imageData.data.set(
+              uintArray.subarray(srcOffset, srcOffset + chunkWidth * 4),
+              dstOffset
+            );
+          }
+          jpegCtx.putImageData(imageData, chunkX, chunkY);
+        } else {
+          rowChunks.push({ chunkBuffer, chunkWidth, chunkHeight });
+        }
+
         numChunksProcessed++;
         this.photoProgress = numChunksProcessed / totalChunks;
       }
 
-      const buffers = rowChunks.map((chunk) => chunk.chunkBuffer);
-      await callWorker(
-        worker,
-        "addRowChunks",
-        {
-          buffers,
-          widths: rowChunks.map((chunk) => chunk.chunkWidth),
-          height: chunkHeight,
-        },
-        buffers
-      );
+      if (!isJpeg && worker) {
+        const buffers = rowChunks.map((chunk) => chunk.chunkBuffer);
+        await callWorker(
+          worker,
+          "addRowChunks",
+          {
+            buffers,
+            widths: rowChunks.map((chunk) => chunk.chunkWidth),
+            height: chunkHeight,
+          },
+          buffers
+        );
+      }
     }
 
     renderer.dispose();
 
-    const imageBuffer = await callWorker(worker, "finish", {});
-    this.latestExportBlob = new Blob([imageBuffer]);
-
-    worker.terminate();
+    if (isJpeg && jpegCanvas) {
+      this.latestExportBlob = await new Promise<Blob>((resolve, reject) => {
+        jpegCanvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error("Failed to create JPEG")),
+          "image/jpeg",
+          0.92
+        );
+      });
+    } else if (worker) {
+      const imageBuffer = await callWorker(worker, "finish", {});
+      this.latestExportBlob = new Blob([imageBuffer]);
+      worker.terminate();
+    }
 
     // Dispose export textures
     exportTextures.forEach((t) => t?.dispose());
@@ -195,8 +236,9 @@ class ExportManager {
   }
 
   async shareExport() {
-    if (!this.latestExportBlob) await this.exportImage();
-    this.shareFile(this.latestExportBlob!, "png");
+    await this.exportImage();
+    const ext = this.exportFormat === "jpeg" ? "jpg" : "png";
+    this.shareFile(this.latestExportBlob!, ext);
   }
 
   shareVideo() {
@@ -204,10 +246,15 @@ class ExportManager {
   }
 
   private shareFile(blob: Blob, extension: string) {
+    const mimeTypes: Record<string, string> = {
+      png: "image/png",
+      jpg: "image/jpeg",
+      webm: "video/webm",
+    };
     const filename = `${new Date().getTime()}.${extension}`;
     const files = [
       new File([blob], filename, {
-        type: extension === "png" ? "image/png" : "video/webm",
+        type: mimeTypes[extension] || "application/octet-stream",
         lastModified: new Date().getTime(),
       }),
     ];
@@ -218,10 +265,11 @@ class ExportManager {
   }
 
   async downloadExport() {
-    if (!this.latestExportBlob) await this.exportImage();
+    await this.exportImage();
 
+    const ext = this.exportFormat === "jpeg" ? "jpg" : "png";
     const url = URL.createObjectURL(this.latestExportBlob!);
-    this.downloadFile(url, "png");
+    this.downloadFile(url, ext);
     URL.revokeObjectURL(url);
   }
 
