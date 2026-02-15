@@ -5,6 +5,7 @@ import {
   VideoTexture,
 } from "three";
 import { InputOutput } from "../types";
+import RecentPicturesManager from "./recent-pictures-manager";
 import ShaderManager from "./shader-manager";
 
 const PREVIEW_MAX_DIM = 1200;
@@ -251,6 +252,9 @@ class CameraManager {
       // Update the input type
       const input = this.inputs[index];
       if (input) input.type = "captured";
+
+      // Save to recent pictures
+      RecentPicturesManager.addPicture(fullRes);
     } finally {
       this.capturingForInput = null;
       await this.startVideoStream(true);
@@ -295,6 +299,9 @@ class CameraManager {
     if (!hasLiveInput) return;
 
     const fullRes = await this.captureHighResPhoto();
+
+    // Save to recent pictures
+    RecentPicturesManager.addPicture(fullRes);
 
     // Store the capture for every live input
     this.inputs.forEach((input, i) => {
@@ -353,6 +360,27 @@ class CameraManager {
     ctx.drawImage(img, 0, 0);
 
     URL.revokeObjectURL(url);
+
+    const preview = downsizeToCanvas(fullRes, PREVIEW_MAX_DIM);
+    const previewTexture = new CanvasTexture(preview);
+
+    this.inputCaptures[index]?.previewTexture.dispose();
+    this.inputCaptures = {
+      ...this.inputCaptures,
+      [index]: { fullRes, previewTexture },
+    };
+
+    const input = this.inputs[index];
+    if (input) input.type = "captured";
+
+    // Save to recent pictures
+    RecentPicturesManager.addPicture(fullRes);
+  }
+
+  /** Load a recent picture and set it as a captured input */
+  async setInputFromRecent(index: number, pictureId: string) {
+    const fullRes = await RecentPicturesManager.loadPicture(pictureId);
+    if (!fullRes) return;
 
     const preview = downsizeToCanvas(fullRes, PREVIEW_MAX_DIM);
     const previewTexture = new CanvasTexture(preview);
