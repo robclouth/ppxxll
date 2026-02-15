@@ -1,7 +1,8 @@
 import { observer } from "mobx-react";
 import { useEffect, useRef, useState } from "react";
-import { Camera, ImagePlus, Image as ImageIcon, X } from "lucide-react";
+import { Camera, ImagePlus, Image as ImageIcon, X, Clock } from "lucide-react";
 import CameraManager from "../services/camera-manager";
+import RecentPicturesManager from "../services/recent-pictures-manager";
 import ShaderManager from "../services/shader-manager";
 import { Button } from "./ui/button";
 import {
@@ -109,6 +110,37 @@ const InputButton = observer(({ index, onAction }: InputButtonProps) => {
   );
 });
 
+/** Grid of recent picture thumbnails */
+const RecentPicturesGrid = observer(
+  ({ onSelect }: { onSelect: (id: string) => void }) => {
+    const { pictures } = RecentPicturesManager;
+    if (pictures.length === 0) return null;
+
+    return (
+      <div>
+        <div className="flex items-center gap-2 px-1 pb-2 text-sm text-white/50">
+          <Clock className="h-3.5 w-3.5" />
+          Recent
+        </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          {pictures.map((pic) => (
+            <button
+              key={pic.id}
+              className="aspect-square rounded-md overflow-hidden cursor-pointer border border-white/10 hover:border-white/40 transition-colors"
+              onClick={() => onSelect(pic.id)}
+            >
+              <img
+                src={pic.thumbnailDataUrl}
+                className="w-full h-full object-cover"
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+);
+
 function InputStrip() {
   const { activeShader } = ShaderManager;
   const inputs = activeShader?.passes[0].inputs;
@@ -147,6 +179,12 @@ function InputStrip() {
     await CameraManager.setInputFromFile(selectedInput, file);
     // Reset so the same file can be re-selected
     e.target.value = "";
+  }
+
+  async function handleRecentSelect(pictureId: string) {
+    if (selectedInput === null) return;
+    setDrawerOpen(false);
+    await CameraManager.setInputFromRecent(selectedInput, pictureId);
   }
 
   function handleClear() {
@@ -220,6 +258,9 @@ function InputStrip() {
                 Clear
               </Button>
             )}
+
+            {/* Recent pictures */}
+            <RecentPicturesGrid onSelect={handleRecentSelect} />
           </div>
         </DrawerContent>
       </Drawer>

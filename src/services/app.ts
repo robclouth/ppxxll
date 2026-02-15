@@ -1,5 +1,6 @@
 import { configure, makeAutoObservable } from "mobx";
 import CameraManager from "./camera-manager";
+import RecentPicturesManager from "./recent-pictures-manager";
 import RenderManager from "./render-manager";
 import ShaderManager from "./shader-manager";
 import { Cache } from "three";
@@ -33,6 +34,7 @@ class App {
 
   async init() {
     await ShaderManager.init();
+    await RecentPicturesManager.init();
     await CameraManager.init();
     RenderManager.init();
 
